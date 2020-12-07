@@ -44,7 +44,7 @@ var  ss1  =  c_ss[1];
 var  ss2  =  Decrypt(c,sk);
 ```
 To run code using Node.js:
-```js
+```bash
 node kyber768.js
 ```
 
