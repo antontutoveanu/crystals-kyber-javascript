@@ -47,6 +47,24 @@ To run code using Node.js:
 ```bash
 node kyber768.js
 ```
+Test output:
+```bash
+ss1 [
+   97,  32, 209, 176, 112, 188, 129,
+  160, 229,  52,  55,  64, 109,  33,
+  115, 178,  32, 216, 149, 143, 116,
+   45, 205, 242,  18,  30, 115, 177,
+  233, 141, 245, 137
+]
+ss2 [
+   97,  32, 209, 176, 112, 188, 129,
+  160, 229,  52,  55,  64, 109,  33,
+  115, 178,  32, 216, 149, 143, 116,
+   45, 205, 242,  18,  30, 115, 177,
+  233, 141, 245, 137
+]
+1
+```
 
 ## Disclaimer
 All effort has been made to ensure this code is functional and operating as intended according to the original CRYSTALS-KYBER design. Any issues or concerns can be sent to amt597@uowmail.edu.au.
