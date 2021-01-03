@@ -129,7 +129,7 @@ function hexToDec(hexString) {
 // Translated to javascript from: https://github.com/symbolicsoft/kyber-k2so
 // ----------------------------------------------------------------------------------------------
 
-function KeyGen() {
+export function KeyGen768() {
 
     var indcpakeys = indcpaKeypair(paramsK);
 
@@ -170,7 +170,7 @@ function KeyGen() {
     return keys;
 }
 
-function Encrypt(pk) {
+export function Encrypt768(pk) {
     // generate (c, ss) from pk (pk is a 1184 byte array)
     // send c to server
     var publicKey = pk;
@@ -259,7 +259,7 @@ function Encrypt(pk) {
 }
 
 // Decrypts the ciphertext to obtain the shared secret (symmetric key)
-function Decrypt(c, sk) {
+export function Decrypt768(c, sk) {
     // c is the ciphertext (1088 bytes)
     // sk is the secret key (2400 bytes)
     var privateKey = sk;

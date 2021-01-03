@@ -26,26 +26,26 @@ The exchange can be visualised below:
 ## Usage
 Using Node.js or React:
 ```bash
-npm install sha3
+npm install crystals-kyber
 ```
-Copy and paste kyber768.js file into the intended folder and export the KeyGen/Encrypt/Decrypt functions if needed.
+Import the functions at the top of your js file.
+```js
+import {K768_KeyGen, K768_Encrypt, K768_Decrypt} from 'crystals-kyber';
+```
+To use in your code:
 ```js
 // To generate a public and private key pair (pk, sk)
-var  pk_sk  =  KeyGen();
-var  pk  =  pk_sk[0];
-var  sk  =  pk_sk[1];
+var pk_sk = K768_KeyGen();
+var pk = pk_sk[0];
+var sk = pk_sk[1];
 
 // To generate a random 256 bit symmetric key (ss) and its encapsulation (c)
-var  c_ss  =  Encrypt(pk);
-var  c  =  c_ss[0];
-var  ss1  =  c_ss[1];
+var c_ss = K768_Encrypt(pk);
+var c = c_ss[0];
+var ss1 = c_ss[1];
 
 // To decapsulate and obtain the same symmetric key
-var  ss2  =  Decrypt(c,sk);
-```
-To run code using Node.js:
-```bash
-node kyber768.js
+var ss2 = K768_Decrypt(c,sk);
 ```
 Test output:
 ```bash

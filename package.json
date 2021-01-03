@@ -1,0 +1,17 @@
+{
+    "name": "crystals-kyber",
+    "version": "2.0.1",
+    "description": "JavaScript implementation of CRYSTALS-KYBER (version 3) post-quantum key exchange algorithm.",
+    "license": "MIT",
+    "repository": "antontutoveanu/crystals-kyber-javascript",
+    "main": "index.js",
+    "keywords": [
+        "post-quantum",
+        "post-quantum-cryptography",
+        "crystals-kyber",
+        "javascript"
+    ],
+    "dependencies": {
+        "sha3": "2.1.3"
+    }
+}
