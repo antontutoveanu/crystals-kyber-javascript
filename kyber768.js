@@ -332,6 +332,7 @@ function indcpaEncrypt(m, publicKey, coins, paramsK) {
 
     var ciphertext = new Array(1088);
 
+    // initialise 
     var sp = polyvecNew(paramsK);
     var ep = polyvecNew(paramsK);
     var bp = polyvecNew(paramsK);
@@ -476,11 +477,15 @@ function polyvecFromBytes(a, paramsK) {
 function polyToBytes(a) {
     var t0, t1;
     var r = new Array(384);
-    var a2 = polyCSubQ(a);
+    var a2 = polyCSubQ(a); // Returns: a - q if a >= q, else a (each coefficient of the polynomial)
+    // for 0-127
     for (var i = 0; i < paramsN / 2; i++) {
+        // get two coefficient entries in the polynomial
         t0 = uint16(a2[2 * i]);
         t1 = uint16(a2[2 * i + 1]);
-        r[3 * i + 0] = byte(t0 >> 0);
+
+        // convert the 2 coefficient into 3 bytes
+        r[3 * i + 0] = byte(t0 >> 0); // byte() does mod 256 of the input (output value 0-255)
         r[3 * i + 1] = byte(t0 >> 8) | byte(t1 << 4);
         r[3 * i + 2] = byte(t1 >> 4);
     }
@@ -559,33 +564,47 @@ function indcpaKeypair(paramsK) {
     var noiseSeed = buf1.slice(32, 64);
 
 
+    // generate public matrix A
     var a = indcpaGenMatrix(publicSeed, false, paramsK);
 
+    // sample secret s
     var nonce = 0;
     for (var i = 0; i < paramsK; i++) {
         skpv[i] = polyGetNoise(noiseSeed, nonce);
         nonce = nonce + 1;
     }
 
+    // sample noise e
     for (var i = 0; i < paramsK; i++) {
         e[i] = polyGetNoise(noiseSeed, nonce);
         nonce = nonce + 1;
     }
 
+    // perform number theoretic transform on secret s
     var skpv = polyvecNtt(skpv, paramsK);
+    // barrett reduction
     var skpv = polyvecReduce(skpv, paramsK);
+
+    // perform number theoretic transform on error/noise e
     var e = polyvecNtt(e, paramsK);
 
+    // calculate A.s
     for (var i = 0; i < paramsK; i++) {
         pkpv[i] = polyToMont(polyvecPointWiseAccMontgomery(a[i], skpv, paramsK));
     }
 
+    // calculate addition of e
     pkpv = polyvecAdd(pkpv, e, paramsK);
+
+    // barrett reduction
     pkpv = polyvecReduce(pkpv, paramsK);
 
     var keys = new Array(2);
-    keys[0] = indcpaPackPublicKey(pkpv, publicSeed, paramsK);
-    keys[1] = indcpaPackPrivateKey(skpv, paramsK);
+    // encode the public key vector of polynomials from As+e into a byte array and append the public seed (already a byte array)
+    keys[0] = indcpaPackPublicKey(pkpv, publicSeed, paramsK); // public key
+
+    // encode secret vector of polynomials s
+    keys[1] = indcpaPackPrivateKey(skpv, paramsK); // secret key
 
     return keys;
 }
@@ -594,82 +613,99 @@ function indcpaKeypair(paramsK) {
 // from a seed. Entries of the matrix are polynomials that look uniformly random.
 // Performs rejection sampling on the output of an extendable-output function (XOF).
 function indcpaGenMatrix(seed, transposed, paramsK) {
-    var r = new Array(3);
-    var buf = new Array(3 * 168);
+    var a = new Array(3);
+    var output = new Array(3 * 168);
     const xof = new SHAKE(128);
     var ctr = 0;
-    var buflen, off;
+    var buflen, offset;
     for (var i = 0; i < paramsK; i++) {
 
-        r[i] = polyvecNew(paramsK);
-        var transposon = new Array(2);
+        a[i] = polyvecNew(paramsK);
+        var transpose = new Array(2);
 
         for (var j = 0; j < paramsK; j++) {
-            transposon[0] = j;
-            transposon[1] = i;
+
+            // set if transposed matrix or not
+            transpose[0] = j;
+            transpose[1] = i;
             if (transposed) {
-                transposon[0] = i;
-                transposon[1] = j;
+                transpose[0] = i;
+                transpose[1] = j;
             }
+
+            // obtain xof of (seed+i+j) or (seed+j+i) depending on above code
+            // output is 504 bytes in length
             xof.reset();
             const buffer1 = Buffer.from(seed);
-            const buffer2 = Buffer.from(transposon);
+            const buffer2 = Buffer.from(transpose);
             xof.update(buffer1).update(buffer2);
             var buf_str = xof.digest({ buffer: Buffer.alloc(504), format: 'hex' });
             // convert hex string to array
             for (var n = 0; n < 504; n++) {
-                buf[n] = hexToDec(buf_str[2 * n] + buf_str[2 * n + 1]);
+                output[n] = hexToDec(buf_str[2 * n] + buf_str[2 * n + 1]);
             }
 
-            buflen = 3 * 168;
+            // run rejection sampling on the output from above
+            outputlen = 3 * 168; // 504
             var result = new Array(2);
-            result = indcpaRejUniform(buf, buflen);
-            r[i][j] = result[0];
-            ctr = result[1];
+            result = indcpaRejUniform(output, outputlen);
+            a[i][j] = result[0]; // the result here is an NTT-representation
+            ctr = result[1]; // keeps track of index of output array from sampling function
 
-            while (ctr < paramsN) {
-                var bufn = buf.slice(0, 168);
+            while (ctr < paramsN) { // if the polynomial hasnt been filled yet with mod q entries
+                var outputn = output.slice(0, 168); // take first 168 bytes of byte array from xof
                 var result1 = new Array(2);
-                result1 = indcpaRejUniform(bufn, 168);
-                var missing = result1[0];
-                var ctrn = result1[1];
+                result1 = indcpaRejUniform(outputn, 168); // run sampling function again
+                var missing = result1[0]; // here is additional mod q polynomial coefficients
+                var ctrn = result1[1]; // how many coefficients were accepted and are in the output
 
-                for (var k = ctr; k < paramsN - ctr; k++) {
-                    r[i][j][k] = missing[paramsN - ctr + k];
+                // starting at last position of output array from first sampling function until 256 is reached
+                for (var k = ctr; k < paramsN - ctr; k++) { 
+                    a[i][j][k] = missing[k - ctr]; // fill rest of array with the additional coefficients until full
                 }
-                ctr = ctr + ctrn;
+                ctr = ctr + ctrn; // update index
             }
+
         }
     }
-    return r;
+    return a;
 }
 
 // indcpaRejUniform runs rejection sampling on uniform random bytes
 // to generate uniform random integers modulo `Q`.
 function indcpaRejUniform(buf, bufl) {
     var r = new Array(384).fill(0); // each element is uint16 (0-65535)
-    var val0, val1;
-    var ctr = 0;
-    var pos = 0;
+    var val0, val1; // d1, d2 in kyber documentation
+    var pos = 0; // i
+    var ctr = 0; // j
+
+    // while less than 256 (the length of the output array: a(i,j)) 
+    // and if there's still elements in the input buffer left
     while (ctr < paramsN && pos + 3 <= bufl) {
 
-        val0 = (uint16((buf[pos + 0]) >> 0) | (uint16(buf[pos + 1]) << 8)) & 0xFFF;
+        // compute d1 and d2
+        val0 = (uint16((buf[pos]) >> 0) | (uint16(buf[pos + 1]) << 8)) & 0xFFF;
         val1 = (uint16((buf[pos + 1]) >> 4) | (uint16(buf[pos + 2]) << 4)) & 0xFFF;
-        pos = pos + 3;
 
+        // if d1 is less than 3329
         if (val0 < paramsQ) {
-            r[ctr] = int16(val0);
+            // assign to d1
+            r[ctr] = val0;
+            // increment position of output array
             ctr = ctr + 1;
         }
         if (ctr < paramsN && val1 < paramsQ) {
-            r[ctr] = int16(val1);
+            r[ctr] = val1;
             ctr = ctr + 1;
         }
+
+        // increment input buffer index by 3
+        pos = pos + 3;
     }
 
     var result = new Array(2);
-    result[0] = r;
-    result[1] = ctr;
+    result[0] = r; // returns polynomial NTT representation
+    result[1] = ctr; // ideally should return 256
     return result;
 }
 
@@ -694,7 +730,7 @@ function indcpaPrf(l, key, nonce) {
     const buffer1 = Buffer.from(key);
     const buffer2 = Buffer.from(nonce_arr);
     hash.update(buffer1).update(buffer2);
-    var hash_str = hash.digest({ buffer: Buffer.alloc(l), format: 'hex' });
+    var hash_str = hash.digest({ buffer: Buffer.alloc(l), format: 'hex' }); // 128 long byte array
     // convert hex string to array
     for (var n = 0; n < l; n++) {
         buf[n] = hexToDec(hash_str[2 * n] + hash_str[2 * n + 1]);
@@ -708,7 +744,7 @@ function indcpaPrf(l, key, nonce) {
 function byteopsCbd(buf) {
     var t, d;
     var a, b;
-    var r = new Array(384).fill(0); // each element is int16 (0-65535)
+    var r = new Array(384).fill(0); 
     for (var i = 0; i < paramsN / 8; i++) {
         t = (byteopsLoad32(buf.slice(4 * i, buf.length)) >>> 0);
         d = ((t & 0x55555555) >>> 0);
@@ -751,26 +787,29 @@ function polyNtt(r) {
 // ntt performs an inplace number-theoretic transform (NTT) in `Rq`.
 // The input is in standard order, the output is in bit-reversed order.
 function ntt(r) {
-    var r3 = new Array(384);
-    r3 = r;
     var j = 0;
     var k = 1;
     var zeta;
     var t;
+    // 128, 64, 32, 16, 8, 4, 2
     for (var l = 128; l >= 2; l >>= 1) {
+        // 0, 
         for (var start = 0; start < 256; start = j + l) {
             zeta = nttZetas[k];
             k = k + 1;
+            // for each element in the subsections (128, 64, 32, 16, 8, 4, 2) starting at an offset
             for (j = start; j < start + l; j++) {
-                t = nttFqMul(zeta, r3[j + l]);
-                r3[j + l] = r3[j] - t;
-                r3[j] = r3[j] + t;
+                // compute the modular multiplication of the zeta and each element in the subsection
+                t = nttFqMul(zeta, r[j + l]); // t is mod q
+                // overwrite each element in the subsection as the opposite subsection element minus t
+                r[j + l] = r[j] - t;
+                // add t back again to the opposite subsection
+                r[j] = r[j] + t;
+                
             }
         }
     }
-    var r1 = new Array(384);
-    r1 = r3;
-    return r1;
+    return r;
 }
 
 // nttFqMul performs multiplication followed by Montgomery reduction
@@ -1067,9 +1106,14 @@ function polyDecompress(a, paramsK) {
 }
 
 // byteopsCSubQ conditionally subtracts Q from a.
+// if a is 3329 then convert to 0
+// Returns:     a - q if a >= q, else a
 function byteopsCSubQ(a) {
-    a = a - int16(paramsQ);
-    a = a + ((a >> 15) & int16(paramsQ));
+    a = a - paramsQ; // should result in a negative integer
+    // push left most signed bit to right most position
+    // remember javascript does bitwise operations in signed 32 bit
+    // add q back again if left most bit was 0 (positive number)
+    a = a + ((a >> 31) & paramsQ);
     return a;
 }
 
