@@ -617,7 +617,6 @@ function indcpaGenMatrix(seed, transposed, paramsK) {
     var output = new Array(3 * 168);
     const xof = new SHAKE(128);
     var ctr = 0;
-    var buflen, offset;
     for (var i = 0; i < paramsK; i++) {
 
         a[i] = polyvecNew(paramsK);
@@ -634,34 +633,36 @@ function indcpaGenMatrix(seed, transposed, paramsK) {
             }
 
             // obtain xof of (seed+i+j) or (seed+j+i) depending on above code
-            // output is 504 bytes in length
+            // output is 672 bytes in length
             xof.reset();
             const buffer1 = Buffer.from(seed);
             const buffer2 = Buffer.from(transpose);
             xof.update(buffer1).update(buffer2);
-            var buf_str = xof.digest({ buffer: Buffer.alloc(504), format: 'hex' });
+            var buf_str = xof.digest({ buffer: Buffer.alloc(672), format: 'hex' });
             // convert hex string to array
-            for (var n = 0; n < 504; n++) {
+            for (var n = 0; n < 672; n++) {
                 output[n] = hexToDec(buf_str[2 * n] + buf_str[2 * n + 1]);
             }
 
             // run rejection sampling on the output from above
             outputlen = 3 * 168; // 504
             var result = new Array(2);
-            result = indcpaRejUniform(output, outputlen);
+            result = indcpaRejUniform(output.slice(0,504), outputlen, paramsN);
             a[i][j] = result[0]; // the result here is an NTT-representation
             ctr = result[1]; // keeps track of index of output array from sampling function
 
             while (ctr < paramsN) { // if the polynomial hasnt been filled yet with mod q entries
-                var outputn = output.slice(0, 168); // take first 168 bytes of byte array from xof
+
+                var outputn = output.slice(504, 672); // take last 168 bytes of byte array from xof
+
                 var result1 = new Array(2);
-                result1 = indcpaRejUniform(outputn, 168); // run sampling function again
+                result1 = indcpaRejUniform(outputn, 168, paramsN-ctr); // run sampling function again
                 var missing = result1[0]; // here is additional mod q polynomial coefficients
                 var ctrn = result1[1]; // how many coefficients were accepted and are in the output
-
+                console.log(missing);
                 // starting at last position of output array from first sampling function until 256 is reached
-                for (var k = ctr; k < paramsN - ctr; k++) { 
-                    a[i][j][k] = missing[k - ctr]; // fill rest of array with the additional coefficients until full
+                for (var k = ctr; k < paramsN; k++) { 
+                    a[i][j][k] = missing[k-ctr]; // fill rest of array with the additional coefficients until full
                 }
                 ctr = ctr + ctrn; // update index
             }
@@ -673,19 +674,20 @@ function indcpaGenMatrix(seed, transposed, paramsK) {
 
 // indcpaRejUniform runs rejection sampling on uniform random bytes
 // to generate uniform random integers modulo `Q`.
-function indcpaRejUniform(buf, bufl) {
-    var r = new Array(384).fill(0); // each element is uint16 (0-65535)
+function indcpaRejUniform(buf, bufl, len) {
+    var r = new Array(384).fill(0);
     var val0, val1; // d1, d2 in kyber documentation
     var pos = 0; // i
     var ctr = 0; // j
 
-    // while less than 256 (the length of the output array: a(i,j)) 
-    // and if there's still elements in the input buffer left
-    while (ctr < paramsN && pos + 3 <= bufl) {
+    while (ctr < len && pos + 3 <= bufl) {
 
         // compute d1 and d2
         val0 = (uint16((buf[pos]) >> 0) | (uint16(buf[pos + 1]) << 8)) & 0xFFF;
         val1 = (uint16((buf[pos + 1]) >> 4) | (uint16(buf[pos + 2]) << 4)) & 0xFFF;
+
+        // increment input buffer index by 3
+        pos = pos + 3;
 
         // if d1 is less than 3329
         if (val0 < paramsQ) {
@@ -694,13 +696,12 @@ function indcpaRejUniform(buf, bufl) {
             // increment position of output array
             ctr = ctr + 1;
         }
-        if (ctr < paramsN && val1 < paramsQ) {
+        if (ctr < len && val1 < paramsQ) {
             r[ctr] = val1;
             ctr = ctr + 1;
         }
 
-        // increment input buffer index by 3
-        pos = pos + 3;
+        
     }
 
     var result = new Array(2);
