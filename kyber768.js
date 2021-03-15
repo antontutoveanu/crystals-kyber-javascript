@@ -659,7 +659,6 @@ function indcpaGenMatrix(seed, transposed, paramsK) {
                 result1 = indcpaRejUniform(outputn, 168, paramsN-ctr); // run sampling function again
                 var missing = result1[0]; // here is additional mod q polynomial coefficients
                 var ctrn = result1[1]; // how many coefficients were accepted and are in the output
-                console.log(missing);
                 // starting at last position of output array from first sampling function until 256 is reached
                 for (var k = ctr; k < paramsN; k++) { 
                     a[i][j][k] = missing[k-ctr]; // fill rest of array with the additional coefficients until full
@@ -1223,17 +1222,87 @@ function ArrayCompare(a, b) {
 }
 
 
+// test run function
+function TestK768(){
+
+    // read values from PQCkemKAT_2400.rsp
+    // sk, ct, ss
+
+    var fs = require('fs');
+    var textByLine = fs.readFileSync('PQCkemKAT_2400.rsp').toString().split("\n");
+
+    // console.log(textByLine.length); // seems to be an array of strings (lines)
+    var sk100 = [];
+    var ct100 = [];
+    var ss100 = [];
+    var counter = 0;
+    while (counter < textByLine.length){
+        if (textByLine[counter][0] == 'c' && textByLine[counter][1] == 't'){
+            var tmp = [];
+            for (j = 0; j < 1088; j++) {
+                tmp[j] = hexToDec(textByLine[counter][2 * j + 5] + textByLine[counter][2 * j + 1 + 5]);
+            }
+            ct100.push(tmp);
+            counter = counter + 1;
+            continue;
+        }
+        else if(textByLine[counter][0] == 's' && textByLine[counter][1] == 's'){
+            var tmp = [];
+            for (j = 0; j < 32; j++) {
+                tmp[j] = hexToDec(textByLine[counter][2 * j + 5] + textByLine[counter][2 * j + 1 + 5]);
+            }
+            ss100.push(tmp);
+            counter = counter + 1;
+            continue;
+        }
+        else if(textByLine[counter][0] == 's' && textByLine[counter][1] == 'k'){
+            var tmp = [];
+            for (j = 0; j < 2400; j++) {
+                tmp[j] = hexToDec(textByLine[counter][2 * j + 5] + textByLine[counter][2 * j + 1 + 5]);
+            }
+            sk100.push(tmp);
+            counter = counter + 1;
+            continue;
+        }
+        else{
+            counter = counter + 1;
+        }
+    }
+
+    // convert hex string to byte array
+
+    // for each case (100 total)
+    // test if ss equals Decrypt768(c,sk)
+    for (var i=0; i<100; i++){
+        var ss2 = Decrypt768(ct100[i],sk100[i]);
+
+        // success if both symmetric keys are the same
+        if (ArrayCompare(ss100[i], ss2)){
+            console.log("Test run [", i, "] success");
+        }
+        else{
+            console.log("Test run [", i, "] fail");
+        }
+    }
+    return
+}
 
 // test here
 /*******************************************************
+
+TestK768();
+
+// To generate a public and private key pair (pk, sk)
 var pk_sk = KeyGen();
 var pk = pk_sk[0];
 var sk = pk_sk[1];
 
+// To generate a random 256 bit symmetric key (ss) and its encapsulation (c)
 var c_ss = Encrypt(pk);
 var c = c_ss[0];
 var ss1 = c_ss[1];
 
+// To decapsulate and obtain the same symmetric key
 var ss2 = Decrypt(c, sk);
 
 console.log("ss1", ss1);
@@ -1242,3 +1311,5 @@ console.log("ss2",ss2);
 // returns 1 if both symmetric keys are the same
 console.log(ArrayCompare(ss1, ss2));
 ********************************************************/
+
+
