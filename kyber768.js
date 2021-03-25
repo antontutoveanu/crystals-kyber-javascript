@@ -645,7 +645,7 @@ function indcpaGenMatrix(seed, transposed, paramsK) {
             }
 
             // run rejection sampling on the output from above
-            outputlen = 3 * 168; // 504
+            var outputlen = 3 * 168; // 504
             var result = new Array(2);
             result = indcpaRejUniform(output.slice(0,504), outputlen, paramsN);
             a[i][j] = result[0]; // the result here is an NTT-representation
