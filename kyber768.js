@@ -1269,7 +1269,7 @@ function TestK768(){
         }
     }
 
-    // convert hex string to byte array
+    var failures = 0;
 
     // for each case (100 total)
     // test if ss equals Decrypt768(c,sk)
@@ -1282,7 +1282,17 @@ function TestK768(){
         }
         else{
             console.log("Test run [", i, "] fail");
+            fail += 1;
         }
+    }
+
+    if(failures==0){
+        console.log(" ");
+        console.log("All test runs successful.")
+    }
+    else{
+        console.log(" ");
+        console.log(failures, " test cases have failed.")
     }
     return
 }

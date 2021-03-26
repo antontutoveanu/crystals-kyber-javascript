@@ -93,6 +93,8 @@ Test run [ 96 ] success
 Test run [ 97 ] success
 Test run [ 98 ] success
 Test run [ 99 ] success
+
+All test runs successful.
 ```
 
 ## Disclaimer
