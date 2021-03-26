@@ -97,5 +97,9 @@ Test run [ 99 ] success
 All test runs successful.
 ```
 
+## Further Information
+More details about CRYSTALS-KYBER, lattice-based cryptography and a real-life use of this algorithm can be
+read here [Active Implementation of Post-Quantum End-to-End Encryption](https://eprint.iacr.org/2021/356.pdf) [17 Mar 2021].
+
 ## Disclaimer
 All effort has been made to ensure this code is functional and operating as intended according to the original CRYSTALS-KYBER design. Any issues or concerns can be sent to amt597@uowmail.edu.au.
