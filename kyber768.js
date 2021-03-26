@@ -1293,17 +1293,17 @@ function TestK768(){
 TestK768();
 
 // To generate a public and private key pair (pk, sk)
-var pk_sk = KeyGen();
+var pk_sk = KeyGen768();
 var pk = pk_sk[0];
 var sk = pk_sk[1];
 
 // To generate a random 256 bit symmetric key (ss) and its encapsulation (c)
-var c_ss = Encrypt(pk);
+var c_ss = Encrypt768(pk);
 var c = c_ss[0];
 var ss1 = c_ss[1];
 
 // To decapsulate and obtain the same symmetric key
-var ss2 = Decrypt(c, sk);
+var ss2 = Decrypt768(c, sk);
 
 console.log("ss1", ss1);
 console.log("ss2",ss2);
