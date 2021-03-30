@@ -5,7 +5,7 @@
 
 This protocol is used to securely establish symmetric keys between two parties. 
 
-This JavaScript implementation is intended for client-side web browser applications but of course can be used for any JavaScript based application.
+This JavaScript implementation is intended for client-side web browser applications but can be used for any JavaScript based application.
 
 Most of this code was translated from [Nadim Kobeissi](https://nadim.computer)'s Go implementation of Kyber which can be found [here](https://github.com/symbolicsoft/kyber-k2so).
 
@@ -74,27 +74,14 @@ Test run [ 2 ] success
 Test run [ 3 ] success
 Test run [ 4 ] success
 Test run [ 5 ] success
-Test run [ 6 ] success
-Test run [ 7 ] success
-Test run [ 8 ] success
-Test run [ 9 ] success
-Test run [ 10 ] success
           .
           .
           .
-Test run [ 89 ] success
-Test run [ 90 ] success
-Test run [ 91 ] success
-Test run [ 92 ] success
-Test run [ 93 ] success
-Test run [ 94 ] success
 Test run [ 95 ] success
 Test run [ 96 ] success
 Test run [ 97 ] success
 Test run [ 98 ] success
 Test run [ 99 ] success
-
-All test runs successful.
 ```
 
 ## Further Information
