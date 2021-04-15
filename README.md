@@ -17,7 +17,7 @@ This code is the most up to date version based off the [NIST PQC Round 3 Submiss
 
 ## Functionality
 
-**KYBER-768** will securely distribute a 256 bit symmetric key between two parties. To safely transmit data over a channel using the key, AES-256 is recommended.
+**KYBER-768** will securely distribute a 256 bit symmetric key between two parties. To safely transmit data over a channel using the key, AES-256 along with HMAC-SHA256 are recommended.
 
 The exchange can be visualised below:
 
@@ -89,4 +89,4 @@ More details about CRYSTALS-KYBER, lattice-based cryptography and a real-life us
 read here [Active Implementation of Post-Quantum End-to-End Encryption](https://eprint.iacr.org/2021/356.pdf) [17 Mar 2021].
 
 ## Disclaimer
-All effort has been made to ensure this code is functional and operating as intended according to the original CRYSTALS-KYBER design. Any issues or concerns can be sent to amt597@uowmail.edu.au.
+All effort has been made to ensure this code is functional and operating as intended according to the original CRYSTALS-KYBER design. Any advice can be sent to amt597@uowmail.edu.au.
