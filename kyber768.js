@@ -291,7 +291,7 @@ export function Decrypt768(c, sk) {
 
     var cmp = indcpaEncrypt(buf, publicKey, kr.slice(32, 64), paramsK);
 
-    var fail = byte(1 - ArrayCompare(c, cmp));
+    var fail = byte(ArrayCompare(c, cmp) - 1);
 
     // krh = sha3.Sum256(c);
     const buffer3 = Buffer.from(c);
