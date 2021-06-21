@@ -1,6 +1,10 @@
 
 # CRYSTALS-KYBER JavaScript
 
+<p align="center">
+  <img src="./kyber.png"/>
+</p>
+
 **CRYSTALS-KYBER** is a post-quantum key exchange protocol.
 
 This protocol is used to securely establish symmetric keys between two parties. 
