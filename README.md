@@ -11,9 +11,9 @@ This protocol is used to securely establish symmetric keys between two parties.
 
 This JavaScript implementation is intended for client-side web browser applications but can be used for any JavaScript based application.
 
-Most of this code was translated from [Nadim Kobeissi](https://nadim.computer)'s Go implementation of Kyber which can be found [here](https://github.com/symbolicsoft/kyber-k2so).
+Most of this code was translated from a Go implementation of Kyber which can be found [here](https://github.com/symbolicsoft/kyber-k2so).
 
-Code by the original designers (written in C) can be found [here](https://github.com/pq-crystals/kyber).
+Original code (written in C) can be found [here](https://github.com/pq-crystals/kyber).
 
 Kyber's original design comes in 512, 768, 1024 security strengths. This implementation only supports the security strength of 768 at the moment. In the future these strengths will be implemented as well as any updates if changes are made to the original design.
 
@@ -90,7 +90,7 @@ Test run [ 99 ] success
 
 ## Further Information
 More details about CRYSTALS-KYBER, lattice-based cryptography and a real-life use of this algorithm can be
-read here [Active Implementation of Post-Quantum End-to-End Encryption](https://eprint.iacr.org/2021/356.pdf) [17 Mar 2021].
+read here [Active Implementation of Post-Quantum End-to-End Encryption](https://eprint.iacr.org/2021/356.pdf) [20 Apr 2021].
 
-## Disclaimer
-All effort has been made to ensure this code is functional and operating as intended according to the original CRYSTALS-KYBER design. Any advice can be sent to amt597@uowmail.edu.au.
+## Contact
+amt597@uowmail.edu.au
