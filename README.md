@@ -15,13 +15,13 @@ Most of this code was translated from a Go implementation of Kyber which can be 
 
 Original code (written in C) can be found [here](https://github.com/pq-crystals/kyber).
 
-Kyber's original design comes in 512, 768, 1024 security strengths. This implementation only supports the security strength of 768 at the moment. In the future these strengths will be implemented as well as any updates if changes are made to the original design.
+Kyber comes in 512, 768, 1024 security strengths. This implementation only supports the security strength of 768 at the moment. In the future these strengths will be implemented as well as any updates if changes are made to the design.
 
 This code is the most up to date version based off the [NIST PQC Round 3 Submissions](https://csrc.nist.gov/projects/post-quantum-cryptography/round-3-submissions).
 
 ## Functionality
 
-**KYBER-768** will securely distribute a 256 bit symmetric key between two parties. To safely transmit data over a channel using the key, AES-256 along with HMAC-SHA256 are recommended.
+**KYBER-768** will securely distribute a 256 bit symmetric key between two parties. To safely transmit data over a channel using the key, AES-256 along with an authentication tag are recommended.
 
 The exchange can be visualised below:
 
@@ -70,7 +70,7 @@ ss2 [
 1
 ```
 ## Running Tests
-Output from function TestK768() that tests compatibility with the original C implementation based on run cases in `PQCkemKAT_2400.rsp`.
+Output from function TestK768() that tests compatibility with the C implementation based on run cases in `PQCkemKAT_2400.rsp`.
 ```bash
 Test run [ 0 ] success
 Test run [ 1 ] success
