@@ -31,6 +31,7 @@ const paramsN = 256;
 const paramsQ = 3329;
 const paramsQinv = 62209;
 const paramsETA = 2;
+
 const paramsPolyBytes = 384;
 const Kyber768SKBytes = 1152 + ((1152 + 32) + 2 * 32);
 const paramsPolyCompressedBytesK768 = 128;
@@ -42,6 +43,7 @@ const paramsPolyvecCompressedBytesK768 = 3 * 320; // 960
 // ----------------------------------------------------------------------------------------------
 // From: https://github.com/FuKyuToTo/lattice-based-cryptography
 // ----------------------------------------------------------------------------------------------
+// Secure Random Int Generator
 function Mash() {
     var n = 0xefc8249d;
 
@@ -125,16 +127,15 @@ function hexToDec(hexString) {
     return parseInt(hexString, 16);
 }
 
-// ----------------------------------------------------------------------------------------------
-// Translated to javascript from: https://github.com/symbolicsoft/kyber-k2so
-// ----------------------------------------------------------------------------------------------
-
-export function KeyGen768() {
-
+// start KYBER code
+function KeyGen768() {
+    // IND-CPA keypair
     var indcpakeys = indcpaKeypair(paramsK);
 
     var indcpaPublicKey = indcpakeys[0];
     var indcpaPrivateKey = indcpakeys[1];
+
+    // FO transform to make IND-CCA2
 
     // get hash of indcpapublickey
     const buffer1 = Buffer.from(indcpaPublicKey);
@@ -153,6 +154,7 @@ export function KeyGen768() {
         rnd[i] = nextInt(256);
     }
 
+    // concatenate to form IND-CCA2 private key: sk + pk + h(pk) + rnd
     var privateKey = indcpaPrivateKey;
     for (var i = 0; i < indcpaPublicKey.length; i++) {
         privateKey.push(indcpaPublicKey[i]);
@@ -170,50 +172,40 @@ export function KeyGen768() {
     return keys;
 }
 
-export function Encrypt768(pk) {
-    // generate (c, ss) from pk (pk is a 1184 byte array)
-    // send c to server
-    var publicKey = pk;
+// Generate (c, ss) from pk
+function Encrypt768(pk) {
 
-    // make 32 byte array
-    var sharedSecret = new Array(32);
-
-    // make a 64 byte buffer array
-    var buf = new Array(64);
-
-    // read 32 random values (0-255) into the 64 byte array
+    // random 32 bytes
+    var m = new Array(32);
     for (var i = 0; i < 32; i++) {
-        buf[i] = nextInt(256);
+        m[i] = nextInt(256);
     }
 
-    // buf_tmp = buf[:32]
-    var buf_tmp = buf.slice(0, 32);
-    const buffer1 = Buffer.from(buf_tmp);
-
-    // buf1 = sha3.sum256 of buf1
+    // hash m with SHA3-256
+    const buffer1 = Buffer.from(m);
     const hash1 = new SHA3(256);
     hash1.update(buffer1);
-    buf_tmp = hash1.digest('hex');
+    var buf_tmp = hash1.digest('hex');
     // convert hex string to array
-    var buf1 = new Array(32);
+    var mh = new Array(32);
     for (i = 0; i < 32; i++) {
-        buf1[i] = hexToDec(buf_tmp[2 * i] + buf_tmp[2 * i + 1]);
+        mh[i] = hexToDec(buf_tmp[2 * i] + buf_tmp[2 * i + 1]);
     }
 
-    // buf2 = sha3.sum256 of publicKey[0:1184]
-    const buffer2 = Buffer.from(publicKey);
+    // hash pk with SHA3-256
+    const buffer2 = Buffer.from(pk);
     const hash2 = new SHA3(256);
     hash2.update(buffer2);
-    buf_tmp = hash2.digest('hex');
+    var buf_tmp = hash2.digest('hex');
     // convert hex string to array
-    var buf2 = new Array(32);
+    var pkh = new Array(32);
     for (i = 0; i < 32; i++) {
-        buf2[i] = hexToDec(buf_tmp[2 * i] + buf_tmp[2 * i + 1]);
+        pkh[i] = hexToDec(buf_tmp[2 * i] + buf_tmp[2 * i + 1]);
     }
 
-    // kr = sha3.sum512 of (buf1 + buf2) concatenate
-    const buffer3 = Buffer.from(buf1);
-    const buffer4 = Buffer.from(buf2);
+    // hash mh and pkh with SHA3-512
+    const buffer3 = Buffer.from(mh);
+    const buffer4 = Buffer.from(pkh);
     const hash3 = new SHA3(512);
     hash3.update(buffer3).update(buffer4);
     var kr_str = hash3.digest('hex');
@@ -225,106 +217,194 @@ export function Encrypt768(pk) {
     var kr1 = kr.slice(0, 32);
     var kr2 = kr.slice(32, 64);
 
-    // c = indcpaEncrypt(buf1, publicKey, kr[32:], paramsK)
-    var ciphertext = new Array(1088);
-    ciphertext = indcpaEncrypt(buf1, publicKey, kr2, paramsK);
+    // generate ciphertext c
+    var c = indcpaEncrypt(mh, pk, kr2, paramsK);
 
-    // krc = sha3.Sum256(ciphertext)
-    const buffer5 = Buffer.from(ciphertext);
-    var krc = new Array(32);
+    // hash ciphertext with SHA3-256
+    const buffer5 = Buffer.from(c);
     const hash4 = new SHA3(256);
     hash4.update(buffer5);
-    var krc_str = hash4.digest('hex');
+    var ch_str = hash4.digest('hex');
     // convert hex string to array
+    var ch = new Array(32);
     for (i = 0; i < 32; i++) {
-        krc[i] = hexToDec(krc_str[2 * i] + krc_str[2 * i + 1]);
+        ch[i] = hexToDec(ch_str[2 * i] + ch_str[2 * i + 1]);
     }
 
-    // sha3.ShakeSum256(sharedSecret, append(kr[:paramsSymBytes], krc[:]...))
+    // hash kr1 and ch with SHAKE-256
     const buffer6 = Buffer.from(kr1);
-    const buffer7 = Buffer.from(krc);
+    const buffer7 = Buffer.from(ch);
     const hash5 = new SHAKE(256);
     hash5.update(buffer6).update(buffer7);
     var ss_str = hash5.digest('hex');
     // convert hex string to array
+    var ss = new Array(32);
     for (i = 0; i < 32; i++) {
-        sharedSecret[i] = hexToDec(ss_str[2 * i] + ss_str[2 * i + 1]);
+        ss[i] = hexToDec(ss_str[2 * i] + ss_str[2 * i + 1]);
     }
 
+    // output (c, ss)
     var result = new Array(2);
-    result[0] = ciphertext;
-    result[1] = sharedSecret;
+    result[0] = c;
+    result[1] = ss;
 
     return result;
 }
 
 // Decrypts the ciphertext to obtain the shared secret (symmetric key)
-export function Decrypt768(c, sk) {
-    // c is the ciphertext (1088 bytes)
-    // sk is the secret key (2400 bytes)
-    var privateKey = sk;
+function Decrypt768(c, privateKey) {
 
-    // make 32 byte array
-    var sharedSecret = new Array(32);
+    // extract sk, pk, pkh and z
+    var sk = privateKey.slice(0, 1152);
+    var pk = privateKey.slice(1152, 2336);
+    var pkh = privateKey.slice(2336, 2368);
+    var z = privateKey.slice(2368, 2400);
 
-    var indcpaPrivateKey = sk.slice(0, 3 * 384);
+    // IND-CPA decrypt
+    var m = indcpaDecrypt(c, sk, paramsK);
 
-    var pki = 3 * 384 + 3 * 384 + 32;
-
-    var publicKey = sk.slice(1152, pki);
-
-    var buf = indcpaDecrypt(c, indcpaPrivateKey, paramsK);
-
-    var ski = (1152 + ((1152 + 32) + 2 * 32)) - 2 * 32;
-
-    // kr = sha3.Sum512(append(buf, privateKey[ski:ski+paramsSymBytes]...))
-    const buffer1 = Buffer.from(buf);
-    const buffer2 = Buffer.from(privateKey.slice(ski, ski + 32));
+    // hash m and pkh with SHA3-512
+    const buffer1 = Buffer.from(m);
+    const buffer2 = Buffer.from(pkh);
     const hash1 = new SHA3(512);
     hash1.update(buffer1).update(buffer2);
     var kr_str = hash1.digest('hex');
     // convert hex string to array
-    var kr = new Array(32);
+    var kr = new Array(64);
     for (i = 0; i < 64; i++) {
         kr[i] = hexToDec(kr_str[2 * i] + kr_str[2 * i + 1]);
     }
+    var kr1 = kr.slice(0, 32);
+    var kr2 = kr.slice(32, 64);
 
-    var cmp = indcpaEncrypt(buf, publicKey, kr.slice(32, 64), paramsK);
+    // IND-CPA encrypt
+    var cmp = indcpaEncrypt(m, pk, kr2, paramsK);
 
-    var fail = byte(ArrayCompare(c, cmp) - 1);
+    // compare c and cmp
+    var fail = ArrayCompare(c, cmp) - 1;
 
-    // krh = sha3.Sum256(c);
+    // hash c with SHA3-256
     const buffer3 = Buffer.from(c);
-    var krh = new Array(32);
     const hash2 = new SHA3(256);
     hash2.update(buffer3);
-    var krh_str = hash2.digest('hex');
+    var ch_str = hash2.digest('hex');
     // convert hex string to array
+    var ch = new Array(32);
     for (i = 0; i < 32; i++) {
-        krh[i] = hexToDec(krh_str[2 * i] + krh_str[2 * i + 1]);
+        ch[i] = hexToDec(ch_str[2 * i] + ch_str[2 * i + 1]);
     }
 
-    var skx;
-    for (var i = 0; i < 32; i++) {
-        skx = privateKey.slice(0, Kyber768SKBytes - 32 + i);
-        kr[i] = kr[i] ^ (fail & (kr[i] ^ skx[i]));
+    if (!fail){
+        // hash kr1 and ch with SHAKE-256
+        const buffer4 = Buffer.from(kr1);
+        const buffer5 = Buffer.from(ch);
+        const hash3 = new SHAKE(256);
+        hash3.update(buffer4).update(buffer5);
+        var ss_str = hash3.digest('hex');
+        // convert hex string to array
+        var ss = new Array(32);
+        for (i = 0; i < 32; i++) {
+            ss[i] = hexToDec(ss_str[2 * i] + ss_str[2 * i + 1]);
+        }
+    } 
+    else{
+        // hash z and ch with SHAKE-256
+        const buffer6 = Buffer.from(z);
+        const buffer7 = Buffer.from(ch);
+        const hash4 = new SHAKE(256);
+        hash4.update(buffer6).update(buffer7);
+        var ss_str = hash4.digest('hex');
+        // convert hex string to array
+        var ss = new Array(32);
+        for (i = 0; i < 32; i++) {
+            ss[i] = hexToDec(ss_str[2 * i] + ss_str[2 * i + 1]);
+        }
     }
-
-    // sha3.ShakeSum256(sharedSecret, append(kr[:paramsSymBytes], krh[:]...))
-    const buffer4 = Buffer.from(kr.slice(0, 32));
-    const buffer5 = Buffer.from(krh);
-    const hash3 = new SHAKE(256);
-    hash3.update(buffer4).update(buffer5);
-    var ss_str = hash3.digest('hex');
-    // convert hex string to array
-    for (i = 0; i < 32; i++) {
-        sharedSecret[i] = hexToDec(ss_str[2 * i] + ss_str[2 * i + 1]);
-    }
-
-    var ss = sharedSecret;
-
     return ss;
 }
+
+// indcpaKeypair generates public and private keys for the CPA-secure
+// public-key encryption scheme underlying Kyber.
+function indcpaKeypair(paramsK) {
+
+    // random bytes for seed
+    var rnd = new Array(32);
+    for (var i = 0; i < 32; i++) {
+        rnd[i] = nextInt(256);
+    }
+
+    // hash rnd with SHA3-512
+    const buffer1 = Buffer.from(rnd);
+    const hash1 = new SHA3(512);
+    hash1.update(buffer1);
+    var seed_str = hash1.digest('hex');
+    // convert hex string to array
+    var seed = new Array(64);
+    for (i = 0; i < 64; i++) {
+        seed[i] = hexToDec(seed_str[2 * i] + seed_str[2 * i + 1]);
+    }
+    var publicSeed = seed.slice(0, 32);
+    var noiseSeed = seed.slice(32, 64);
+
+    // generate public matrix A
+    var a = generateMatrixA(publicSeed, false, paramsK);
+
+    // sample secret s
+    var s = new Array(paramsK);
+    var nonce = 0;
+    for (var i = 0; i < paramsK; i++) {
+        s[i] = sample(noiseSeed, nonce);
+        nonce = nonce + 1;
+    }
+
+    // sample noise e
+    var e = new Array(paramsK);
+    for (var i = 0; i < paramsK; i++) {
+        e[i] = sample(noiseSeed, nonce);
+        nonce = nonce + 1;
+    }
+
+    // perform number theoretic transform on secret s
+    for (var i = 0; i < paramsK; i++) {
+        s[i] = ntt(s[i]);
+    }
+
+    // perform number theoretic transform on error/noise e
+    for (var i = 0; i < paramsK; i++) {
+        e[i] = ntt(e[i]);
+    }
+
+    console.log("before barret: ", s);
+
+    // barrett reduction
+    s = polyvecReduce(s, paramsK);
+
+    console.log("after barret: ", s);
+
+    // calculate A.s + e = pk
+    var pk = new Array(paramsK);
+    for (var i = 0; i < paramsK; i++) {
+        pk[i] = polyToMont(polyvecPointWiseAccMontgomery(a[i], s, paramsK));
+    }
+
+    // calculate addition of e
+    pk = polyvecAdd(pk, e, paramsK);
+    
+    // barrett reduction
+    pk = polyvecReduce(pk, paramsK);
+    
+    // encode the public key vector of polynomials from As+e into a byte array and append the public seed (already a byte array)
+    var keys = new Array(2);
+    keys[0] = indcpaPackPublicKey(pk, publicSeed, paramsK); // public key
+
+    // encode secret vector of polynomials s
+    keys[1] = indcpaPackPrivateKey(s, paramsK); // secret key
+
+    return keys;
+}
+
+
+
 
 // indcpaEncrypt is the encryption function of the CPA-secure
 // public-key encryption scheme underlying Kyber.
@@ -344,16 +424,18 @@ function indcpaEncrypt(m, publicKey, coins, paramsK) {
 
     var k = polyFromMsg(m);
 
-    var at = indcpaGenMatrix(seed, true, paramsK);
+    var at = generateMatrixA(seed, true, paramsK);
 
     for (var i = 0; i < paramsK; i++) {
-        sp[i] = polyGetNoise(coins, i);
-        ep[i] = polyGetNoise(coins, i + paramsK);
+        sp[i] = sample(coins, i);
+        ep[i] = sample(coins, i + paramsK);
     }
 
-    var epp = polyGetNoise(coins, paramsK * 2);
+    var epp = sample(coins, paramsK * 2);
 
-    sp = polyvecNtt(sp, paramsK);
+    for (var i = 0; i < paramsK; i++) {
+        sp[i] = ntt(sp[i]);
+    }
 
     sp = polyvecReduce(sp, paramsK);
 
@@ -389,9 +471,11 @@ function indcpaDecrypt(c, privateKey, paramsK) {
 
     var privateKeyPolyvec = indcpaUnpackPrivateKey(privateKey, paramsK);
 
-    var bp2 = polyvecNtt(bp, paramsK);
+    for (var i = 0; i < paramsK; i++) {
+        bp[i] = ntt(bp[i]);
+    }
 
-    var mp = polyvecPointWiseAccMontgomery(privateKeyPolyvec, bp2, paramsK);
+    var mp = polyvecPointWiseAccMontgomery(privateKeyPolyvec, bp, paramsK);
 
     var mp2 = polyInvNttToMont(mp);
 
@@ -532,87 +616,12 @@ function polyFromMsg(msg) {
     return r;
 }
 
-// indcpaKeypair generates public and private keys for the CPA-secure
-// public-key encryption scheme underlying Kyber.
-function indcpaKeypair(paramsK) {
-
-    var skpv = polyvecNew(paramsK);
-    var pkpv = polyvecNew(paramsK);
-    var e = polyvecNew(paramsK);
-
-    // make a 64 byte buffer array
-    var buf = new Array(64);
-
-    // read 32 random values (0-255) into the 64 byte array
-    for (var i = 0; i < 32; i++) {
-        buf[i] = nextInt(256);
-    }
-
-    // take the first 32 bytes and hash it
-    var buf_tmp = buf.slice(0, 32);
-    const buffer1 = Buffer.from(buf_tmp);
-    const hash1 = new SHA3(512);
-    hash1.update(buffer1);
-    var buf_str = hash1.digest('hex');
-    // convert hex string to array
-    var buf1 = new Array(64);
-    for (i = 0; i < 64; i++) {
-        buf1[i] = hexToDec(buf_str[2 * i] + buf_str[2 * i + 1]);
-    }
-
-    var publicSeed = buf1.slice(0, 32);
-    var noiseSeed = buf1.slice(32, 64);
 
 
-    // generate public matrix A
-    var a = indcpaGenMatrix(publicSeed, false, paramsK);
-
-    // sample secret s
-    var nonce = 0;
-    for (var i = 0; i < paramsK; i++) {
-        skpv[i] = polyGetNoise(noiseSeed, nonce);
-        nonce = nonce + 1;
-    }
-
-    // sample noise e
-    for (var i = 0; i < paramsK; i++) {
-        e[i] = polyGetNoise(noiseSeed, nonce);
-        nonce = nonce + 1;
-    }
-
-    // perform number theoretic transform on secret s
-    var skpv = polyvecNtt(skpv, paramsK);
-    // barrett reduction
-    var skpv = polyvecReduce(skpv, paramsK);
-
-    // perform number theoretic transform on error/noise e
-    var e = polyvecNtt(e, paramsK);
-
-    // calculate A.s
-    for (var i = 0; i < paramsK; i++) {
-        pkpv[i] = polyToMont(polyvecPointWiseAccMontgomery(a[i], skpv, paramsK));
-    }
-
-    // calculate addition of e
-    pkpv = polyvecAdd(pkpv, e, paramsK);
-
-    // barrett reduction
-    pkpv = polyvecReduce(pkpv, paramsK);
-
-    var keys = new Array(2);
-    // encode the public key vector of polynomials from As+e into a byte array and append the public seed (already a byte array)
-    keys[0] = indcpaPackPublicKey(pkpv, publicSeed, paramsK); // public key
-
-    // encode secret vector of polynomials s
-    keys[1] = indcpaPackPrivateKey(skpv, paramsK); // secret key
-
-    return keys;
-}
-
-// indcpaGenMatrix deterministically generates a matrix `A` (or the transpose of `A`)
+// generateMatrixA deterministically generates a matrix `A` (or the transpose of `A`)
 // from a seed. Entries of the matrix are polynomials that look uniformly random.
 // Performs rejection sampling on the output of an extendable-output function (XOF).
-function indcpaGenMatrix(seed, transposed, paramsK) {
+function generateMatrixA(seed, transposed, paramsK) {
     var a = new Array(3);
     var output = new Array(3 * 168);
     const xof = new SHAKE(128);
@@ -709,10 +718,10 @@ function indcpaRejUniform(buf, bufl, len) {
     return result;
 }
 
-// polyGetNoise samples a polynomial deterministically from a seed
+// sample samples a polynomial deterministically from a seed
 // and nonce, with the output polynomial being close to a centered
 // binomial distribution with parameter paramsETA = 2.
-function polyGetNoise(seed, nonce) {
+function sample(seed, nonce) {
     var l = paramsETA * paramsN / 4;
     var p = indcpaPrf(l, seed, nonce);
     return byteopsCbd(p);
@@ -766,22 +775,6 @@ function byteopsLoad32(x) {
     r = (((r | (uint32(x[2]) << 16)) >>> 0) >>> 0);
     r = (((r | (uint32(x[3]) << 24)) >>> 0) >>> 0);
     return uint32(r);
-}
-
-// polyvecNtt applies forward number-theoretic transforms (NTT)
-// to all elements of a vector of polynomials.
-function polyvecNtt(r, paramsK) {
-    for (var i = 0; i < paramsK; i++) {
-        r[i] = polyNtt(r[i]);
-    }
-    return r;
-}
-
-// polyNtt computes a negacyclic number-theoretic transform (NTT) of
-// a polynomial in-place; the input is assumed to be in normal order,
-// while the output is in bit-reversed order.
-function polyNtt(r) {
-    return ntt(r);
 }
 
 // ntt performs an inplace number-theoretic transform (NTT) in `Rq`.
@@ -1322,4 +1315,23 @@ console.log("ss2",ss2);
 console.log(ArrayCompare(ss1, ss2));
 ********************************************************/
 
+TestK768();
 
+// To generate a public and private key pair (pk, sk)
+var pk_sk = KeyGen768();
+var pk = pk_sk[0];
+var sk = pk_sk[1];
+
+// To generate a random 256 bit symmetric key (ss) and its encapsulation (c)
+var c_ss = Encrypt768(pk);
+var c = c_ss[0];
+var ss1 = c_ss[1];
+
+// To decapsulate and obtain the same symmetric key
+var ss2 = Decrypt768(c, sk);
+
+console.log("ss1", ss1);
+console.log("ss2",ss2);
+
+// returns 1 if both symmetric keys are the same
+console.log(ArrayCompare(ss1, ss2));
