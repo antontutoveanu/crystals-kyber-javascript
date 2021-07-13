@@ -128,9 +128,9 @@ function hexToDec(hexString) {
 }
 
 // start KYBER code
-function KeyGen768() {
+export function KeyGen768() {
     // IND-CPA keypair
-    var indcpakeys = indcpaKeypair(paramsK);
+    var indcpakeys = indcpaKeypair();
 
     var indcpaPublicKey = indcpakeys[0];
     var indcpaPrivateKey = indcpakeys[1];
@@ -173,7 +173,7 @@ function KeyGen768() {
 }
 
 // Generate (c, ss) from pk
-function Encrypt768(pk) {
+export function Encrypt768(pk) {
 
     // random 32 bytes
     var m = new Array(32);
@@ -218,7 +218,7 @@ function Encrypt768(pk) {
     var kr2 = kr.slice(32, 64);
 
     // generate ciphertext c
-    var c = indcpaEncrypt(mh, pk, kr2, paramsK);
+    var c = indcpaEncrypt(pk, mh, kr2);
 
     // hash ciphertext with SHA3-256
     const buffer5 = Buffer.from(c);
@@ -252,7 +252,7 @@ function Encrypt768(pk) {
 }
 
 // Decrypts the ciphertext to obtain the shared secret (symmetric key)
-function Decrypt768(c, privateKey) {
+export function Decrypt768(c, privateKey) {
 
     // extract sk, pk, pkh and z
     var sk = privateKey.slice(0, 1152);
@@ -261,7 +261,7 @@ function Decrypt768(c, privateKey) {
     var z = privateKey.slice(2368, 2400);
 
     // IND-CPA decrypt
-    var m = indcpaDecrypt(c, sk, paramsK);
+    var m = indcpaDecrypt(c, sk);
 
     // hash m and pkh with SHA3-512
     const buffer1 = Buffer.from(m);
@@ -278,7 +278,7 @@ function Decrypt768(c, privateKey) {
     var kr2 = kr.slice(32, 64);
 
     // IND-CPA encrypt
-    var cmp = indcpaEncrypt(m, pk, kr2, paramsK);
+    var cmp = indcpaEncrypt(pk, m, kr2);
 
     // compare c and cmp
     var fail = ArrayCompare(c, cmp) - 1;
@@ -325,7 +325,7 @@ function Decrypt768(c, privateKey) {
 
 // indcpaKeypair generates public and private keys for the CPA-secure
 // public-key encryption scheme underlying Kyber.
-function indcpaKeypair(paramsK) {
+function indcpaKeypair() {
 
     // random bytes for seed
     var rnd = new Array(32);
@@ -346,7 +346,7 @@ function indcpaKeypair(paramsK) {
     var publicSeed = seed.slice(0, 32);
     var noiseSeed = seed.slice(32, 64);
 
-    // generate public matrix A
+    // generate public matrix A (already in NTT form)
     var a = generateMatrixA(publicSeed, false, paramsK);
 
     // sample secret s
@@ -374,31 +374,59 @@ function indcpaKeypair(paramsK) {
         e[i] = ntt(e[i]);
     }
 
-    console.log("before barret: ", s);
-
     // barrett reduction
-    s = polyvecReduce(s, paramsK);
+    for (var i = 0; i < paramsK; i++) {
+        s[i] = reduce(s[i]);
+    }
 
-    console.log("after barret: ", s);
+    // KEY COMPUTATION
+    // A.s + e = pk
 
-    // calculate A.s + e = pk
+    // calculate A.s
     var pk = new Array(paramsK);
     for (var i = 0; i < paramsK; i++) {
-        pk[i] = polyToMont(polyvecPointWiseAccMontgomery(a[i], s, paramsK));
+        // montgomery reduction
+        pk[i] = polyToMont(multiply(a[i], s));
     }
 
     // calculate addition of e
-    pk = polyvecAdd(pk, e, paramsK);
+    for (var i = 0; i < paramsK; i++) {
+        pk[i] = add(pk[i], e[i]);
+    }
     
     // barrett reduction
-    pk = polyvecReduce(pk, paramsK);
-    
-    // encode the public key vector of polynomials from As+e into a byte array and append the public seed (already a byte array)
-    var keys = new Array(2);
-    keys[0] = indcpaPackPublicKey(pk, publicSeed, paramsK); // public key
+    for (var i = 0; i < paramsK; i++) {
+        pk[i] = reduce(pk[i]);
+    }
 
-    // encode secret vector of polynomials s
-    keys[1] = indcpaPackPrivateKey(s, paramsK); // secret key
+    // ENCODE KEYS
+    var keys = new Array(2);
+    
+    // PUBLIC KEY
+    // turn polynomials into byte arrays
+    keys[0] = [];
+    var bytes = [];
+    for (var i = 0; i < paramsK; i++) {
+        bytes = polyToBytes(a[i]);
+        for (var j = 0; j < bytes.length; j++) {
+            keys[0].push(bytes[j]);
+        }
+    }
+    // append public seed
+    for (var i = 0; i < publicSeed.length; i++) {
+        keys[0].push(publicSeed[i]);
+    }
+
+    // PRIVATE KEY
+    // turn polynomials into byte arrays
+    keys[1] = [];
+    var bytes = [];
+    for (var i = 0; i < paramsK; i++) {
+        bytes = polyToBytes(a[i]);
+        for (var j = 0; j < bytes.length; j++) {
+            keys[1].push(bytes[j]);
+        }
+    }
 
     return keys;
 }
@@ -408,145 +436,136 @@ function indcpaKeypair(paramsK) {
 
 // indcpaEncrypt is the encryption function of the CPA-secure
 // public-key encryption scheme underlying Kyber.
-function indcpaEncrypt(m, publicKey, coins, paramsK) {
+function indcpaEncrypt(pk1, msg, coins) {
 
-    var ciphertext = new Array(1088);
-
-    // initialise 
-    var sp = polyvecNew(paramsK);
-    var ep = polyvecNew(paramsK);
-    var bp = polyvecNew(paramsK);
-
-    var result = indcpaUnpackPublicKey(publicKey, paramsK);
-
-    var publicKeyPolyvec = result[0];
-    var seed = result[1];
-
-    var k = polyFromMsg(m);
-
-    var at = generateMatrixA(seed, true, paramsK);
-
+    // DECODE PUBLIC KEY
+    var pk = new Array(paramsK);
+    var start;
+    var end;
     for (var i = 0; i < paramsK; i++) {
-        sp[i] = sample(coins, i);
-        ep[i] = sample(coins, i + paramsK);
+        start = (i * 384);
+        end = (i + 1) * 384;
+        pk[i] = polyFromBytes(pk1.slice(start, end));
+    }
+    var seed = pk1.slice(1152, 1184);
+
+    // generate transpose of public matrix A
+    var at = generateMatrixA(seed, true);
+
+    // sample random vector r
+    var r = new Array(paramsK);
+    var nonce = 0;
+    for (var i = 0; i < paramsK; i++) {
+        r[i] = sample(coins, nonce);
+        nonce = nonce + 1;
     }
 
-    var epp = sample(coins, paramsK * 2);
-
+    // sample error vector e1
+    var e1 = new Array(paramsK);
     for (var i = 0; i < paramsK; i++) {
-        sp[i] = ntt(sp[i]);
+        e1[i] = sample(coins, nonce);
+        nonce = nonce + 1;
     }
 
-    sp = polyvecReduce(sp, paramsK);
+    // sample e2
+    var e2 = sample(coins, nonce);
 
+    // perform number theoretic transform on random vector r
+    for (var i = 0; i < paramsK; i++) {
+        r[i] = ntt(r[i]);
+    }
 
+    // barrett reduction
+    for (var i = 0; i < paramsK; i++) {
+        r[i] = reduce(r[i]);
+    }
+
+    // ENCRYPT COMPUTATION
+    // A.r + e1 = u
+    // pk.r + e2 + m = v
+
+    // calculate A.r
+    var u = new Array(paramsK);
     for (i = 0; i < paramsK; i++) {
-        bp[i] = polyvecPointWiseAccMontgomery(at[i], sp, paramsK);
+        u[i] = multiply(at[i], r);
     }
 
-    var v = polyvecPointWiseAccMontgomery(publicKeyPolyvec, sp, paramsK);
+    // perform inverse number theoretic transform on A.r
+    for (var i = 0; i < paramsK; i++) {
+        u[i] = nttInverse(u[i]);
+    }
 
-    bp = polyvecInvNttToMont(bp, paramsK);
+    // calculate addition of e1
+    for (var i = 0; i < paramsK; i++) {
+        u[i] = add(u[i], e1[i]);
+    }
 
-    v = polyInvNttToMont(v);
+    // decode message m
+    var m = polyFromMsg(msg);
 
-    var bp1 = polyvecAdd(bp, ep, paramsK);
+    // calculate pk.r
+    var v = multiply(pk, r);
 
-    v = polyAdd(polyAdd(v, epp), k);
+    // perform inverse number theoretic transform on pk.r
+    v = nttInverse(v);
 
-    var bp3 = polyvecReduce(bp1, paramsK);
+    // calculate addition of e2
+    v = add(v, e2);
 
-    ciphertext = indcpaPackCiphertext(bp3, polyReduce(v), paramsK);
-    return ciphertext;
+    // calculate addition of m
+    v = add(v, m);
+
+    // barrett reduction
+    for (var i = 0; i < paramsK; i++) {
+        u[i] = reduce(u[i]);
+    }
+
+    // barrett reduction
+    v = reduce(v);
+
+    c = indcpaPackCiphertext(u, v);
+
+    return c;
 }
 
 // indcpaDecrypt is the decryption function of the CPA-secure
 // public-key encryption scheme underlying Kyber.
-function indcpaDecrypt(c, privateKey, paramsK) {
+function indcpaDecrypt(c, privateKey) {
 
-    var result = indcpaUnpackCiphertext(c, paramsK);
+    var result = indcpaUnpackCiphertext(c);
 
     var bp = result[0];
     var v = result[1];
 
-    var privateKeyPolyvec = indcpaUnpackPrivateKey(privateKey, paramsK);
+    var privateKeyPolyvec = indcpaUnpackPrivateKey(privateKey);
 
     for (var i = 0; i < paramsK; i++) {
         bp[i] = ntt(bp[i]);
     }
 
-    var mp = polyvecPointWiseAccMontgomery(privateKeyPolyvec, bp, paramsK);
+    var mp = multiply(privateKeyPolyvec, bp);
 
-    var mp2 = polyInvNttToMont(mp);
+    var mp = nttInverse(mp);
 
-    var mp3 = polySub(v, mp2);
+    var mp = polySub(v, mp);
 
-    var mp4 = polyReduce(mp3);
+    var mp = reduce(mp);
 
-    return polyToMsg(mp4);
-}
-
-// polyvecNew instantiates a new vector of polynomials.
-function polyvecNew(paramsK) {
-    // make array containing 3 elements of type poly
-    var pv = new Array(paramsK);
-    for (var i = 0; i < paramsK; i++) {
-        pv[i] = new Array(384);
-    }
-    return pv;
-}
-
-// indcpaPackPublicKey serializes the public key as a concatenation of the
-// serialized vector of polynomials of the public key, and the public seed
-// used to generate the matrix `A`.
-function indcpaPackPublicKey(publicKey, seed, paramsK) {
-    var array = polyvecToBytes(publicKey, paramsK);
-    for (var i = 0; i < seed.length; i++) {
-        array.push(seed[i]);
-    }
-    return array;
-}
-
-// indcpaUnpackPublicKey de-serializes the public key from a byte array
-// and represents the approximate inverse of indcpaPackPublicKey.
-function indcpaUnpackPublicKey(packedPublicKey, paramsK) {
-    var publicKeyPolyvec = polyvecFromBytes(packedPublicKey, paramsK);
-    var seed = packedPublicKey.slice(1152, 1184);
-
-    // return values
-    var result = new Array(2);
-    result[0] = publicKeyPolyvec;
-    result[1] = seed;
-    return result;
-}
-
-// indcpaPackPrivateKey serializes the private key.
-function indcpaPackPrivateKey(privateKey, paramsK) {
-    return polyvecToBytes(privateKey, paramsK);
+    return polyToMsg(mp);
 }
 
 // indcpaUnpackPrivateKey de-serializes the private key and represents
 // the inverse of indcpaPackPrivateKey.
-function indcpaUnpackPrivateKey(packedPrivateKey, paramsK) {
-    return polyvecFromBytes(packedPrivateKey, paramsK);
-}
-
-// polyvecToBytes serializes a vector of polynomials.
-function polyvecToBytes(a, paramsK) {
-    var r = [];
-    var tmp = [];
-    for (var i = 0; i < paramsK; i++) {
-        tmp = polyToBytes(a[i]);
-        for (var j = 0; j < tmp.length; j++) {
-            r.push(tmp[j]);
-        }
-    }
-    return r;
+function indcpaUnpackPrivateKey(packedPrivateKey) {
+    return polyvecFromBytes(packedPrivateKey);
 }
 
 // polyvecFromBytes deserializes a vector of polynomials.
-function polyvecFromBytes(a, paramsK) {
-    var r = polyvecNew(paramsK);
+function polyvecFromBytes(a) {
+    var r = new Array(paramsK);
+    for (var i = 0; i < paramsK; i++) {
+        r[i] = new Array(384);
+    }
     var start;
     var end;
     for (var i = 0; i < paramsK; i++) {
@@ -579,7 +598,7 @@ function polyToBytes(a) {
 // polyFromBytes de-serialises an array of bytes into a polynomial,
 // and represents the inverse of polyToBytes.
 function polyFromBytes(a) {
-    var r = new Array(384).fill(0); // each element is int16 (0-65535)
+    var r = new Array(384).fill(0);
     for (var i = 0; i < paramsN / 2; i++) {
         r[2 * i] = int16(((uint16(a[3 * i + 0]) >> 0) | (uint16(a[3 * i + 1]) << 8)) & 0xFFF);
         r[2 * i + 1] = int16(((uint16(a[3 * i + 1]) >> 4) | (uint16(a[3 * i + 2]) << 4)) & 0xFFF);
@@ -616,19 +635,27 @@ function polyFromMsg(msg) {
     return r;
 }
 
+// polyReduce applies Barrett reduction to all coefficients of a polynomial.
+function polyReduce(r) {
+    for (var i = 0; i < paramsN; i++) {
+        r[i] = barrett(r[i]);
+    }
+    return r;
+}
+
 
 
 // generateMatrixA deterministically generates a matrix `A` (or the transpose of `A`)
 // from a seed. Entries of the matrix are polynomials that look uniformly random.
 // Performs rejection sampling on the output of an extendable-output function (XOF).
-function generateMatrixA(seed, transposed, paramsK) {
+function generateMatrixA(seed, transposed) {
     var a = new Array(3);
     var output = new Array(3 * 168);
     const xof = new SHAKE(128);
     var ctr = 0;
     for (var i = 0; i < paramsK; i++) {
 
-        a[i] = polyvecNew(paramsK);
+        a[i] = new Array(paramsK);
         var transpose = new Array(2);
 
         for (var j = 0; j < paramsK; j++) {
@@ -811,6 +838,24 @@ function nttFqMul(a, b) {
     return byteopsMontgomeryReduce(a * b);
 }
 
+// reduce applies Barrett reduction to all coefficients of a polynomial.
+function reduce(r) {
+    for (var i = 0; i < paramsN; i++) {
+        r[i] = barrett(r[i]);
+    }
+    return r;
+}
+
+// barrett computes a Barrett reduction; given
+// a integer `a`, returns a integer congruent to
+// `a mod Q` in {0,...,Q}.
+function barrett(a) {
+    var v = ( (1<<24) + paramsQ / 2) / paramsQ;
+    var t = v * a >> 24;
+    t = t * paramsQ;
+    return a - t;
+}
+
 // byteopsMontgomeryReduce computes a Montgomery reduction; given
 // a 32-bit integer `a`, returns `a * R^-1 mod Q` where `R=2^16`.
 function byteopsMontgomeryReduce(a) {
@@ -819,23 +864,6 @@ function byteopsMontgomeryReduce(a) {
     t = a - t;
     t >>= 16;
     return int16(t);
-}
-
-// polyvecReduce applies Barrett reduction to each coefficient of each element
-// of a vector of polynomials.
-function polyvecReduce(r, paramsK) {
-    for (var i = 0; i < paramsK; i++) {
-        r[i] = polyReduce(r[i]);
-    }
-    return r;
-}
-
-// polyReduce applies Barrett reduction to all coefficients of a polynomial.
-function polyReduce(r) {
-    for (var i = 0; i < paramsN; i++) {
-        r[i] = byteopsBarrettReduce(r[i]);
-    }
-    return r;
 }
 
 // polyToMont performs the in-place conversion of all coefficients
@@ -849,27 +877,16 @@ function polyToMont(r) {
     return r;
 }
 
-// byteopsBarrettReduce computes a Barrett reduction; given
-// a 16-bit integer `a`, returns a 16-bit integer congruent to
-// `a mod Q` in {0,...,Q}.
-function byteopsBarrettReduce(a) {
-    var t;
-    var v = int16(((1 << 26) + paramsQ / 2) / paramsQ);
-    t = int16(int32(v) * int32(a) >> 26);
-    t = t * paramsQ;
-    return a - t;
-}
-
-// polyvecPointWiseAccMontgomery pointwise-multiplies elements of polynomial-vectors
+// pointwise-multiplies elements of polynomial-vectors
 // `a` and `b`, accumulates the results into `r`, and then multiplies by `2^-16`.
-function polyvecPointWiseAccMontgomery(a, b, paramsK) {
+function multiply(a, b) {
     var r = polyBaseMulMontgomery(a[0], b[0]);
     var t;
     for (var i = 1; i < paramsK; i++) {
         t = polyBaseMulMontgomery(a[i], b[i]);
-        r = polyAdd(r, t);
+        r = add(r, t);
     }
-    return polyReduce(r);
+    return reduce(r);
 }
 
 // polyBaseMulMontgomery performs the multiplication of two polynomials
@@ -908,23 +925,13 @@ function nttBaseMul(a0, a1, b0, b1, zeta) {
     return r;
 }
 
-// polyAdd adds two polynomials.
-function polyAdd(a, b) {
+// add adds two polynomials.
+function add(a, b) {
     var c = new Array(384);
     for (var i = 0; i < paramsN; i++) {
         c[i] = a[i] + b[i];
     }
     return c;
-}
-
-// polyvecInvNttToMont applies the inverse number-theoretic transform (NTT)
-// to all elements of a vector of polynomials and multiplies by Montgomery
-// factor `2^16`.
-function polyvecInvNttToMont(r, paramsK) {
-    for (var i = 0; i < paramsK; i++) {
-        r[i] = polyInvNttToMont(r[i]);
-    }
-    return r;
 }
 
 // polySub subtracts two polynomials.
@@ -935,17 +942,10 @@ function polySub(a, b) {
     return a;
 }
 
-// polyInvNttToMont computes the inverse of a negacyclic number-theoretic
-// transform (NTT) of a polynomial in-place; the input is assumed to be in
-// bit-reversed order, while the output is in normal order.
-function polyInvNttToMont(r) {
-    return nttInv(r);
-}
-
-// nttInv performs an inplace inverse number-theoretic transform (NTT)
+// nttInverse performs an inplace inverse number-theoretic transform (NTT)
 // in `Rq` and multiplication by Montgomery factor 2^16.
 // The input is in bit-reversed order, the output is in standard order.
-function nttInv(r) {
+function nttInverse(r) {
     var j = 0;
     var k = 0;
     var zeta;
@@ -956,7 +956,7 @@ function nttInv(r) {
             k = k + 1;
             for (j = start; j < start + l; j++) {
                 t = r[j];
-                r[j] = byteopsBarrettReduce(t + r[j + l]);
+                r[j] = barrett(t + r[j + l]);
                 r[j + l] = t - r[j + l];
                 r[j + l] = nttFqMul(zeta, r[j + l]);
             }
@@ -968,30 +968,21 @@ function nttInv(r) {
     return r;
 }
 
-// polyvecAdd adds two vectors of polynomials.
-function polyvecAdd(a, b, paramsK) {
-    var c = new Array(3);
-    for (var i = 0; i < paramsK; i++) {
-        c[i] = polyAdd(a[i], b[i]);
-    }
-    return c;
-}
-
 // indcpaPackCiphertext serializes the ciphertext as a concatenation of
 // the compressed and serialized vector of polynomials `b` and the
 // compressed and serialized polynomial `v`.
-function indcpaPackCiphertext(b, v, paramsK) {
-    var arr1 = polyvecCompress(b, paramsK);
-    var arr2 = polyCompress(v, paramsK);
+function indcpaPackCiphertext(b, v) {
+    var arr1 = polyvecCompress(b);
+    var arr2 = polyCompress(v);
     return arr1.concat(arr2);
 }
 
 // indcpaUnpackCiphertext de-serializes and decompresses the ciphertext
 // from a byte array, and represents the approximate inverse of
 // indcpaPackCiphertext.
-function indcpaUnpackCiphertext(c, paramsK) {
-    var b = polyvecDecompress(c.slice(0, 960), paramsK);
-    var v = polyDecompress(c.slice(960, 1088), paramsK);
+function indcpaUnpackCiphertext(c) {
+    var b = polyvecDecompress(c.slice(0, 960));
+    var v = polyDecompress(c.slice(960, 1088));
     var result = new Array(2);
     result[0] = b;
     result[1] = v;
@@ -999,9 +990,9 @@ function indcpaUnpackCiphertext(c, paramsK) {
 }
 
 // polyvecCompress lossily compresses and serializes a vector of polynomials.
-function polyvecCompress(a, paramsK) {
+function polyvecCompress(a) {
 
-    a = polyvecCSubQ(a, paramsK);
+    a = polyvecCSubQ(a);
 
     var rr = 0;
 
@@ -1027,8 +1018,11 @@ function polyvecCompress(a, paramsK) {
 // polyvecDecompress de-serializes and decompresses a vector of polynomials and
 // represents the approximate inverse of polyvecCompress. Since compression is lossy,
 // the results of decompression will may not match the original vector of polynomials.
-function polyvecDecompress(a, paramsK) {
-    var r = polyvecNew(paramsK);
+function polyvecDecompress(a) {
+    var r = new Array(paramsK);
+    for (var i = 0; i < paramsK; i++) {
+        r[i] = new Array(384);
+    }
     var aa = 0;
     var t = new Array(4);
     for (var i = 0; i < paramsK; i++) {
@@ -1048,7 +1042,7 @@ function polyvecDecompress(a, paramsK) {
 
 // polyvecCSubQ applies the conditional subtraction of `Q` to each coefficient
 // of each element of a vector of polynomials.
-function polyvecCSubQ(r, paramsK) {
+function polyvecCSubQ(r) {
     for (var i = 0; i < paramsK; i++) {
         r[i] = polyCSubQ(r[i]);
     }
@@ -1065,7 +1059,7 @@ function polyCSubQ(r) {
 }
 
 // polyCompress lossily compresses and subsequently serializes a polynomial.
-function polyCompress(a, paramsK) {
+function polyCompress(a) {
     var t = new Array(8);
     a = polyCSubQ(a);
     var rr = 0;
@@ -1087,7 +1081,7 @@ function polyCompress(a, paramsK) {
 // representing the approximate inverse of polyCompress.
 // Note that compression is lossy, and thus decompression will not match the
 // original input.
-function polyDecompress(a, paramsK) {
+function polyDecompress(a) {
     var r = new Array(384);
     var aa = 0;
     for (var i = 0; i < paramsN / 2; i++) {
@@ -1275,7 +1269,7 @@ function TestK768(){
         }
         else{
             console.log("Test run [", i, "] fail");
-            fail += 1;
+            failures += 1;
         }
     }
 
@@ -1314,24 +1308,3 @@ console.log("ss2",ss2);
 // returns 1 if both symmetric keys are the same
 console.log(ArrayCompare(ss1, ss2));
 ********************************************************/
-
-TestK768();
-
-// To generate a public and private key pair (pk, sk)
-var pk_sk = KeyGen768();
-var pk = pk_sk[0];
-var sk = pk_sk[1];
-
-// To generate a random 256 bit symmetric key (ss) and its encapsulation (c)
-var c_ss = Encrypt768(pk);
-var c = c_ss[0];
-var ss1 = c_ss[1];
-
-// To decapsulate and obtain the same symmetric key
-var ss2 = Decrypt768(c, sk);
-
-console.log("ss1", ss1);
-console.log("ss2",ss2);
-
-// returns 1 if both symmetric keys are the same
-console.log(ArrayCompare(ss1, ss2));
