@@ -1209,80 +1209,80 @@ function ArrayCompare(a, b) {
 }
 
 
-// test run function
-function TestK768(){
-
-    // read values from PQCkemKAT_2400.rsp
-    // sk, ct, ss
-
-    var fs = require('fs');
-    var textByLine = fs.readFileSync('PQCkemKAT_2400.rsp').toString().split("\n");
-
-    // console.log(textByLine.length); // seems to be an array of strings (lines)
-    var sk100 = [];
-    var ct100 = [];
-    var ss100 = [];
-    var counter = 0;
-    while (counter < textByLine.length){
-        if (textByLine[counter][0] == 'c' && textByLine[counter][1] == 't'){
-            var tmp = [];
-            for (j = 0; j < 1088; j++) {
-                tmp[j] = hexToDec(textByLine[counter][2 * j + 5] + textByLine[counter][2 * j + 1 + 5]);
-            }
-            ct100.push(tmp);
-            counter = counter + 1;
-            continue;
-        }
-        else if(textByLine[counter][0] == 's' && textByLine[counter][1] == 's'){
-            var tmp = [];
-            for (j = 0; j < 32; j++) {
-                tmp[j] = hexToDec(textByLine[counter][2 * j + 5] + textByLine[counter][2 * j + 1 + 5]);
-            }
-            ss100.push(tmp);
-            counter = counter + 1;
-            continue;
-        }
-        else if(textByLine[counter][0] == 's' && textByLine[counter][1] == 'k'){
-            var tmp = [];
-            for (j = 0; j < 2400; j++) {
-                tmp[j] = hexToDec(textByLine[counter][2 * j + 5] + textByLine[counter][2 * j + 1 + 5]);
-            }
-            sk100.push(tmp);
-            counter = counter + 1;
-            continue;
-        }
-        else{
-            counter = counter + 1;
-        }
-    }
-
-    var failures = 0;
-
-    // for each case (100 total)
-    // test if ss equals Decrypt768(c,sk)
-    for (var i=0; i<100; i++){
-        var ss2 = Decrypt768(ct100[i],sk100[i]);
-
-        // success if both symmetric keys are the same
-        if (ArrayCompare(ss100[i], ss2)){
-            console.log("Test run [", i, "] success");
-        }
-        else{
-            console.log("Test run [", i, "] fail");
-            failures += 1;
-        }
-    }
-
-    if(failures==0){
-        console.log(" ");
-        console.log("All test runs successful.")
-    }
-    else{
-        console.log(" ");
-        console.log(failures, " test cases have failed.")
-    }
-    return
-}
+//// test run function
+//function TestK768(){
+//
+//    // read values from PQCkemKAT_2400.rsp
+//    // sk, ct, ss
+//
+//    var fs = require('fs');
+//    var textByLine = fs.readFileSync('PQCkemKAT_2400.rsp').toString().split("\n");
+//
+//    // console.log(textByLine.length); // seems to be an array of strings (lines)
+//    var sk100 = [];
+//    var ct100 = [];
+//    var ss100 = [];
+//    var counter = 0;
+//    while (counter < textByLine.length){
+//        if (textByLine[counter][0] == 'c' && textByLine[counter][1] == 't'){
+//            var tmp = [];
+//            for (j = 0; j < 1088; j++) {
+//                tmp[j] = hexToDec(textByLine[counter][2 * j + 5] + textByLine[counter][2 * j + 1 + 5]);
+//            }
+//            ct100.push(tmp);
+//            counter = counter + 1;
+//            continue;
+//        }
+//        else if(textByLine[counter][0] == 's' && textByLine[counter][1] == 's'){
+//            var tmp = [];
+//            for (j = 0; j < 32; j++) {
+//                tmp[j] = hexToDec(textByLine[counter][2 * j + 5] + textByLine[counter][2 * j + 1 + 5]);
+//            }
+//            ss100.push(tmp);
+//            counter = counter + 1;
+//            continue;
+//        }
+//        else if(textByLine[counter][0] == 's' && textByLine[counter][1] == 'k'){
+//            var tmp = [];
+//            for (j = 0; j < 2400; j++) {
+//                tmp[j] = hexToDec(textByLine[counter][2 * j + 5] + textByLine[counter][2 * j + 1 + 5]);
+//            }
+//            sk100.push(tmp);
+//            counter = counter + 1;
+//            continue;
+//        }
+//        else{
+//            counter = counter + 1;
+//        }
+//    }
+//
+//    var failures = 0;
+//
+//    // for each case (100 total)
+//    // test if ss equals Decrypt768(c,sk)
+//    for (var i=0; i<100; i++){
+//        var ss2 = Decrypt768(ct100[i],sk100[i]);
+//
+//        // success if both symmetric keys are the same
+//        if (ArrayCompare(ss100[i], ss2)){
+//            console.log("Test run [", i, "] success");
+//        }
+//        else{
+//            console.log("Test run [", i, "] fail");
+//            failures += 1;
+//        }
+//    }
+//
+//    if(failures==0){
+//        console.log(" ");
+//        console.log("All test runs successful.")
+//    }
+//    else{
+//        console.log(" ");
+//        console.log(failures, " test cases have failed.")
+//    }
+//    return
+//}
 
 // test here
 /*******************************************************
