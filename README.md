@@ -19,6 +19,9 @@ Kyber comes in 512, 768, 1024 security strengths. This implementation only suppo
 
 This code is the most up to date version based off the [NIST PQC Round 3 Submissions](https://csrc.nist.gov/projects/post-quantum-cryptography/round-3-submissions).
 
+## Fork
+This fork is compatible with typescript/Angular. In doing so tests were removed as the `fs` module is not available with ts/angular.
+
 ## Functionality
 
 **KYBER-768** will securely distribute a 256 bit symmetric key between two parties. To safely transmit data over a channel using the key, AES-256 along with an authentication tag are recommended.
