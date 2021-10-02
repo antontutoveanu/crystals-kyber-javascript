@@ -1318,27 +1318,3 @@ console.log("ss2",ss2);
 // returns 1 if both symmetric keys are the same
 console.log(ArrayCompare(ss1, ss2));
 ********************************************************/
-
-
-TestK512();
-
-// To generate a public and private key pair (pk, sk)
-var pk_sk = KeyGen512();
-var pk = pk_sk[0];
-var sk = pk_sk[1];
-
-// To generate a random 256 bit symmetric key (ss) and its encapsulation (c)
-var c_ss = Encrypt512(pk);
-var c = c_ss[0];
-var ss1 = c_ss[1];
-
-// To decapsulate and obtain the same symmetric key
-var ss2 = Decrypt512(c, sk);
-
-console.log("ss1", ss1);
-console.log("ss2",ss2);
-
-// returns 1 if both symmetric keys are the same
-console.log(ArrayCompare(ss1, ss2));
-
-// console.log(-12345 - Math.floor(-12345*(1/3329)) * 3329);
