@@ -69,7 +69,7 @@ ss2 [
 1
 ```
 ## Running Tests
-Output from function TestK768() that tests compatibility with the C implementation based on run cases in `PQCkemKAT_2400.rsp`.
+Output from function TestK768() that tests compatibility with the C implementation based on run cases in `PQCkemKAT_2400.rsp` (TestK512() and TestK1024() available too).
 ```bash
 Test run [ 0 ] success
 Test run [ 1 ] success
