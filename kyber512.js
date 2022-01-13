@@ -1267,26 +1267,13 @@ function TestK512(){
 // Test here
 /*****************************************************************************************************************************/
 
+/*
 TestK512();
 
 // To generate a public and private key pair (pk, sk)
 let pk_sk = KeyGen512();
 let pk = pk_sk[0];
 let sk = pk_sk[1];
-
-/*
-process.stdout.write('pk: [');
-for (var i=0; i<pk.length; i++){
-    process.stdout.write(pk[i] + ', ');
-}
-process.stdout.write('] \n');
-
-process.stdout.write('sk: [');
-for (var i=0; i<sk.length; i++){
-    process.stdout.write(sk[i] + ', ');
-}
-process.stdout.write('] \n');
-*/
 
 // To generate a random 256 bit symmetric key (ss) and its encapsulation (c)
 let c_ss = Encrypt512(pk);
@@ -1301,4 +1288,8 @@ console.log("ss2",ss2);
 
 // returns 1 if both symmetric keys are the same
 console.log(ArrayCompare(ss1, ss2));
+*/
+
 /*****************************************************************************************************************************/
+
+module.exports = { KeyGen512, Encrypt512, Decrypt512, TestK512 };

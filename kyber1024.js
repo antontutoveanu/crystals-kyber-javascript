@@ -1245,6 +1245,7 @@ function TestK1024(){
 // Test here
 /*****************************************************************************************************************************/
 
+/*
 TestK1024();
 
 // To generate a public and private key pair (pk, sk)
@@ -1265,4 +1266,8 @@ console.log("ss2",ss2);
 
 // returns 1 if both symmetric keys are the same
 console.log(ArrayCompare(ss1, ss2));
+*/
+
 /*****************************************************************************************************************************/
+
+module.exports = { KeyGen1024, Encrypt1024, Decrypt1024, TestK1024 };
