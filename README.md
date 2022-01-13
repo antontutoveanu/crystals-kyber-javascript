@@ -31,11 +31,11 @@ Using Node.js or React:
 ```bash
 npm install crystals-kyber
 ```
-Import the functions at the top of your js file.
+Import the functions at the top of your js file (768 can be replaced with 512 or 1024).
 ```js
 import {K768_KeyGen, K768_Encrypt, K768_Decrypt} from 'crystals-kyber';
 ```
-To use in your code (768 can be replaced with 512 or 1024):
+To use in your code:
 ```js
 // To generate a public and private key pair (pk, sk)
 let pk_sk = K768_KeyGen();
