@@ -1,7 +1,8 @@
-
+/*****************************************************************************************************************************/
+// imports
 const { SHA3 } = require('sha3');
 const { SHAKE } = require('sha3');
-
+/*****************************************************************************************************************************/
 const nttZetas = [
     2285, 2571, 2970, 1812, 1493, 1422, 287, 202, 3158, 622, 1577, 182, 962,
     2127, 1855, 1468, 573, 2004, 264, 383, 2500, 1458, 1727, 3199, 2648, 1017,
@@ -31,7 +32,7 @@ const paramsN = 256;
 const paramsQ = 3329;
 const paramsQinv = 62209;
 const paramsETA = 2;
-
+/*****************************************************************************************************************************/
 // ----------------------------------------------------------------------------------------------
 // From http://baagoe.com/en/RandomMusings/javascript/
 // Johannes Baagøe <baagoe@baagoe.com>, 2010
@@ -107,33 +108,32 @@ function Alea() {
         return random;
     })(Array.prototype.slice.call(arguments));
 }
-
 //prng
 let random = Alea();
 let seed = random.args;
 random = Alea(seed);
-
 // Returns the next pseudorandom, uniformly distributed integer between 0(inclusive) and q-1(inclusive)
 function nextInt(n) {
     return Math.floor(random() * n); //prng.js -> random()
 }
-
 function hexToDec(hexString) {
     return parseInt(hexString, 16);
 }
+/*****************************************************************************************************************************/
+// CRYSTALS-KYBER JAVASCRIPT
 
-// start KYBER code
+// 1. KeyGen
 function KeyGen768() {
     // IND-CPA keypair
-    let indcpakeys = indcpaKeypair();
+    let indcpakeys = indcpaKeyGen();
 
-    let indcpaPublicKey = indcpakeys[0];
-    let indcpaPrivateKey = indcpakeys[1];
+    let pk = indcpakeys[0];
+    let sk = indcpakeys[1];
 
     // FO transform to make IND-CCA2
 
-    // get hash of indcpapublickey
-    const buffer1 = Buffer.from(indcpaPublicKey);
+    // get hash of pk
+    const buffer1 = Buffer.from(pk);
     const hash1 = new SHA3(256);
     hash1.update(buffer1);
     let buf_str = hash1.digest('hex');
@@ -150,27 +150,26 @@ function KeyGen768() {
     }
 
     // concatenate to form IND-CCA2 private key: sk + pk + h(pk) + rnd
-    let privateKey = indcpaPrivateKey;
-    for (let i = 0; i < indcpaPublicKey.length; i++) {
-        privateKey.push(indcpaPublicKey[i]);
+    for (let i = 0; i < pk.length; i++) {
+        sk.push(pk[i]);
     }
     for (let i = 0; i < pkh.length; i++) {
-        privateKey.push(pkh[i]);
+        sk.push(pkh[i]);
     }
     for (let i = 0; i < rnd.length; i++) {
-        privateKey.push(rnd[i]);
+        sk.push(rnd[i]);
     }
 
     let keys = new Array(2);
-    keys[0] = indcpaPublicKey;
-    keys[1] = privateKey;
+    keys[0] = pk;
+    keys[1] = sk;
     return keys;
 }
-
-// Generate (c, ss) from pk
+/*****************************************************************************************************************************/
+// 2. Encrypt
 function Encrypt768(pk) {
 
-    // random 32 bytes
+    // random 32 bytes m
     let m = new Array(32);
     for (let i = 0; i < 32; i++) {
         m[i] = nextInt(256);
@@ -245,8 +244,8 @@ function Encrypt768(pk) {
 
     return result;
 }
-
-// Decrypts the ciphertext to obtain the shared secret (symmetric key)
+/*****************************************************************************************************************************/
+// 3. Decrypt
 function Decrypt768(c, privateKey) {
 
     // extract sk, pk, pkh and z
@@ -316,10 +315,11 @@ function Decrypt768(c, privateKey) {
     }
     return ss;
 }
+/*****************************************************************************************************************************/
 
-// indcpaKeypair generates public and private keys for the CPA-secure
+// indcpaKeyGen generates public and private keys for the CPA-secure
 // public-key encryption scheme underlying Kyber.
-function indcpaKeypair() {
+function indcpaKeyGen() {
 
     // random bytes for seed
     let rnd = new Array(32);
@@ -393,8 +393,6 @@ function indcpaKeypair() {
         pk[i] = reduce(pk[i]);
     }
 
-    
-
     // ENCODE KEYS
     let keys = new Array(2);
     
@@ -423,7 +421,6 @@ function indcpaKeypair() {
             keys[1].push(bytes[j]);
         }
     }
-
     return keys;
 }
 
@@ -531,18 +528,17 @@ function indcpaEncrypt(pk1, msg, coins) {
 // public-key encryption scheme underlying Kyber.
 function indcpaDecrypt(c, privateKey) {
 
-    let result = indcpaUnpackCiphertext(c);
+    // extract ciphertext
+    let u = decompress1(c.slice(0, 960));
+    let v = decompress2(c.slice(960, 1088));
 
-    let bp = result[0];
-    let v = result[1];
-
-    let privateKeyPolyvec = indcpaUnpackPrivateKey(privateKey);
+    let privateKeyPolyvec = polyvecFromBytes(privateKey);
 
     for (let i = 0; i < paramsK; i++) {
-        bp[i] = ntt(bp[i]);
+        u[i] = ntt(u[i]);
     }
 
-    let mp = multiply(privateKeyPolyvec, bp);
+    let mp = multiply(privateKeyPolyvec, u);
 
     mp = nttInverse(mp);
 
@@ -551,12 +547,6 @@ function indcpaDecrypt(c, privateKey) {
     mp = reduce(mp);
 
     return polyToMsg(mp);
-}
-
-// indcpaUnpackPrivateKey de-serializes the private key and represents
-// the inverse of indcpaPackPrivateKey.
-function indcpaUnpackPrivateKey(packedPrivateKey) {
-    return polyvecFromBytes(packedPrivateKey);
 }
 
 // polyvecFromBytes deserializes a vector of polynomials.
@@ -967,18 +957,6 @@ function nttInverse(r) {
     return r;
 }
 
-// indcpaUnpackCiphertext de-serializes and decompresses the ciphertext
-// from a byte array, and represents the approximate inverse of
-// indcpaPackCiphertext.
-function indcpaUnpackCiphertext(c) {
-    let b = polyvecDecompress(c.slice(0, 960));
-    let v = polyDecompress(c.slice(960, 1088));
-    let result = new Array(2);
-    result[0] = b;
-    result[1] = v;
-    return result;
-}
-
 // compress1 lossily compresses and serializes a vector of polynomials.
 function compress1(u) {
     let rr = 0;
@@ -1021,10 +999,10 @@ function compress2(v) {
     return r;
 }
 
-// polyvecDecompress de-serializes and decompresses a vector of polynomials and
+// decompress1 de-serializes and decompresses a vector of polynomials and
 // represents the approximate inverse of compress1. Since compression is lossy,
 // the results of decompression will may not match the original vector of polynomials.
-function polyvecDecompress(a) {
+function decompress1(a) {
     let r = new Array(paramsK);
     for (let i = 0; i < paramsK; i++) {
         r[i] = new Array(384);
@@ -1060,11 +1038,11 @@ function subtract_q(r) {
     return r;
 }
 
-// polyDecompress de-serializes and subsequently decompresses a polynomial,
+// decompress2 de-serializes and subsequently decompresses a polynomial,
 // representing the approximate inverse of compress2.
 // Note that compression is lossy, and thus decompression will not match the
 // original input.
-function polyDecompress(a) {
+function decompress2(a) {
     let r = new Array(384);
     let aa = 0;
     for (let i = 0; i < paramsN / 2; i++) {
@@ -1254,32 +1232,9 @@ function TestK768(){
     }
     return
 }
-
-// test here
-/*******************************************************
-
-TestK768();
-
-// To generate a public and private key pair (pk, sk)
-let pk_sk = KeyGen768();
-let pk = pk_sk[0];
-let sk = pk_sk[1];
-
-// To generate a random 256 bit symmetric key (ss) and its encapsulation (c)
-let c_ss = Encrypt768(pk);
-let c = c_ss[0];
-let ss1 = c_ss[1];
-
-// To decapsulate and obtain the same symmetric key
-let ss2 = Decrypt768(c, sk);
-
-console.log("ss1", ss1);
-console.log("ss2",ss2);
-
-// returns 1 if both symmetric keys are the same
-console.log(ArrayCompare(ss1, ss2));
-********************************************************/
-
+/*****************************************************************************************************************************/
+// Test here
+/*****************************************************************************************************************************/
 
 TestK768();
 
@@ -1302,4 +1257,4 @@ console.log("ss2",ss2);
 // returns 1 if both symmetric keys are the same
 console.log(ArrayCompare(ss1, ss2));
 
-// console.log(-12345 - Math.floor(-12345*(1/3329)) * 3329);
+/*****************************************************************************************************************************/

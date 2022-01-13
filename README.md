@@ -14,13 +14,13 @@ Most of this code was translated from a Go implementation of Kyber which can be 
 
 Original code (written in C) can be found [here](https://github.com/pq-crystals/kyber).
 
-Kyber comes in 512, 768, 1024 security strengths. This implementation only supports the security strength of 768 at the moment. In the future these strengths will be implemented as well as any updates if changes are made to the design.
+Kyber comes in 512, 768, 1024 security strengths.
 
 This code is the most up to date version based off the [NIST PQC Round 3 Submissions](https://csrc.nist.gov/projects/post-quantum-cryptography/round-3-submissions).
 
 ## Functionality
 
-**KYBER-768** will securely distribute a 256 bit symmetric key between two parties. To safely transmit data over a channel using the key, AES-256 along with an authentication tag are recommended.
+**KYBER** will securely distribute a 256 bit symmetric key between two parties. To safely transmit data over a channel using the key, AES-256 along with an authentication tag are recommended.
 
 The exchange can be visualised below:
 
@@ -35,7 +35,7 @@ Import the functions at the top of your js file.
 ```js
 import {K768_KeyGen, K768_Encrypt, K768_Decrypt} from 'crystals-kyber';
 ```
-To use in your code:
+To use in your code (768 can be replaced with 512 or 1024):
 ```js
 // To generate a public and private key pair (pk, sk)
 let pk_sk = K768_KeyGen();
@@ -90,6 +90,3 @@ Test run [ 99 ] success
 ## Further Information
 More details about CRYSTALS-KYBER, lattice-based cryptography and a real-life use of this algorithm can be
 read here [Active Implementation of Post-Quantum End-to-End Encryption](https://eprint.iacr.org/2021/356.pdf) [20 Apr 2021].
-
-## Contact
-amt597@uowmail.edu.au

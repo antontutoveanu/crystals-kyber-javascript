@@ -27,12 +27,11 @@ const nttZetasInv = [
     829, 2946, 3065, 1325, 2756, 1861, 1474, 1202, 2367, 3147, 1752, 2707, 171,
     3127, 3042, 1907, 1836, 1517, 359, 758, 1441];
 
-const paramsK = 2;
+const paramsK = 4;
 const paramsN = 256;
 const paramsQ = 3329;
 const paramsQinv = 62209;
-const paramsETA1 = 3;
-const paramsETA2 = 2;
+const paramsETA = 2;
 /*****************************************************************************************************************************/
 // ----------------------------------------------------------------------------------------------
 // From http://baagoe.com/en/RandomMusings/javascript/
@@ -124,7 +123,7 @@ function hexToDec(hexString) {
 // CRYSTALS-KYBER JAVASCRIPT
 
 // 1. KeyGen
-function KeyGen512() {
+function KeyGen1024() {
     // IND-CPA keypair
     let indcpakeys = indcpaKeyGen();
 
@@ -168,7 +167,7 @@ function KeyGen512() {
 }
 /*****************************************************************************************************************************/
 // 2. Encrypt
-function Encrypt512(pk) {
+function Encrypt1024(pk) {
 
     // random 32 bytes
     let m = new Array(32);
@@ -247,13 +246,13 @@ function Encrypt512(pk) {
 }
 /*****************************************************************************************************************************/
 // 3. Decrypt
-function Decrypt512(c, privateKey) {
+function Decrypt1024(c, privateKey) {
 
     // extract sk, pk, pkh and z
-    let sk = privateKey.slice(0, 768);
-    let pk = privateKey.slice(768, 1568);
-    let pkh = privateKey.slice(1568, 1600);
-    let z = privateKey.slice(1600, 1632);
+    let sk = privateKey.slice(0, 1536); // indcpa secret key
+    let pk = privateKey.slice(1536, 3104); // indcpa public key
+    let pkh = privateKey.slice(3104, 3136); // sha3-256 hash
+    let z = privateKey.slice(3136, 3168);
 
     // IND-CPA decrypt
     let m = indcpaDecrypt(c, sk);
@@ -347,14 +346,14 @@ function indcpaKeyGen() {
     let s = new Array(paramsK);
     let nonce = 0;
     for (let i = 0; i < paramsK; i++) {
-        s[i] = sample1(noiseSeed, nonce);
+        s[i] = sample(noiseSeed, nonce);
         nonce = nonce + 1;
     }
 
     // sample noise e
     let e = new Array(paramsK);
     for (let i = 0; i < paramsK; i++) {
-        e[i] = sample1(noiseSeed, nonce);
+        e[i] = sample(noiseSeed, nonce);
         nonce = nonce + 1;
     }
 
@@ -440,7 +439,7 @@ function indcpaEncrypt(pk1, msg, coins) {
         end = (i + 1) * 384;
         pk[i] = polyFromBytes(pk1.slice(start, end));
     }
-    let seed = pk1.slice(768, 800);
+    let seed = pk1.slice(1536, 1568);
 
     // generate transpose of public matrix A
     let at = generateMatrixA(seed, true);
@@ -449,19 +448,19 @@ function indcpaEncrypt(pk1, msg, coins) {
     let r = new Array(paramsK);
     let nonce = 0;
     for (let i = 0; i < paramsK; i++) {
-        r[i] = sample1(coins, nonce);
+        r[i] = sample(coins, nonce);
         nonce = nonce + 1;
     }
 
     // sample error vector e1
     let e1 = new Array(paramsK);
     for (let i = 0; i < paramsK; i++) {
-        e1[i] = sample2(coins, nonce);
+        e1[i] = sample(coins, nonce);
         nonce = nonce + 1;
     }
 
     // sample e2
-    let e2 = sample2(coins, nonce);
+    let e2 = sample(coins, nonce);
 
     // perform number theoretic transform on random vector r
     for (let i = 0; i < paramsK; i++) {
@@ -529,8 +528,8 @@ function indcpaEncrypt(pk1, msg, coins) {
 function indcpaDecrypt(c, privateKey) {
 
     // extract ciphertext
-    let u = decompress1(c.slice(0, 640));
-    let v = decompress2(c.slice(640, 768));
+    let u = decompress1(c.slice(0, 1408));
+    let v = decompress2(c.slice(1408, 1568));
 
     let privateKeyPolyvec = polyvecFromBytes(privateKey);
 
@@ -662,7 +661,7 @@ function generateMatrixA(seed, transposed) {
             }
 
             // run rejection sampling on the output from above
-            let outputlen = 3 * 168;
+            let outputlen = 3 * 168; // 504
             let result = new Array(2);
             result = indcpaRejUniform(output.slice(0,504), outputlen, paramsN);
             a[i][j] = result[0]; // the result here is an NTT-representation
@@ -726,22 +725,13 @@ function indcpaRejUniform(buf, bufl, len) {
     return result;
 }
 
-// sample1 samples a polynomial deterministically from a seed
+// sample samples a polynomial deterministically from a seed
 // and nonce, with the output polynomial being close to a centered
-// binomial distribution with parameter paramsETA1 = 3.
-function sample1(seed, nonce) {
-    let l = paramsETA1 * paramsN / 4;
+// binomial distribution with parameter paramsETA = 2.
+function sample(seed, nonce) {
+    let l = paramsETA * paramsN / 4;
     let p = prf(l, seed, nonce);
     return byteopsCbd(p);
-}
-
-// sample2 samples a polynomial deterministically from a seed
-// and nonce, with the output polynomial being close to a centered
-// binomial distribution with parameter paramsETA2 = 2.
-function sample2(seed, nonce) {
-    let l = paramsETA2 * paramsN / 4;
-    let p = prf(l, seed, nonce);
-    return byteopsCbd2(p);
 }
 
 // prf provides a pseudo-random function (PRF) which returns
@@ -765,63 +755,33 @@ function prf(l, key, nonce) {
 }
 
 // byteopsCbd computes a polynomial with coefficients distributed
-// according to a centered binomial distribution with parameter paramsETA1,
+// according to a centered binomial distribution with parameter paramsETA,
 // given an array of uniformly random bytes.
 function byteopsCbd(buf) {
     let t, d;
     let a, b;
     let r = new Array(384).fill(0); 
-    for (let i = 0; i < paramsN/4; i++) {
-        t = byteopsLoad24(buf.slice(3*i, buf.length));
-        d = t & 0x00249249;
-        d = d + ((t >> 1) & 0x00249249);
-        d = d + ((t >> 2) & 0x00249249);
-        for (let j = 0; j < 4; j++) {
-            a = int16((d >> (6*j + 0)) & 0x7);
-            b = int16((d >> (6*j + paramsETA1)) & 0x7);
-            r[4*i+j] = a - b;
-        }
-    }
-    return r;
-}
-
-// byteopsCbd2 computes a polynomial with coefficients distributed
-// according to a centered binomial distribution with parameter paramsETA2,
-// given an array of uniformly random bytes.
-function byteopsCbd2(buf) {
-    let t, d;
-    let a, b;
-    let r = new Array(384).fill(0); 
-    for ( let i = 0; i < paramsN/8; i++) {
-        t = byteopsLoad32(buf.slice(4*i,buf.length));
-        d = t & 0x55555555;
-        d = d + ((t >> 1) & 0x55555555);
+    for (let i = 0; i < paramsN / 8; i++) {
+        t = (byteopsLoad32(buf.slice(4 * i, buf.length)) >>> 0);
+        d = ((t & 0x55555555) >>> 0);
+        d = (d + ((((t >> 1) >>> 0) & 0x55555555) >>> 0) >>> 0);
         for (let j = 0; j < 8; j++) {
-            a = int16((d >> (4*j + 0)) & 0x3);
-            b = int16((d >> (4*j + paramsETA2)) & 0x3);
-            r[8*i+j] = a - b;
+            a = int16((((d >> (4 * j + 0)) >>> 0) & 0x3) >>> 0);
+            b = int16((((d >> (4 * j + paramsETA)) >>> 0) & 0x3) >>> 0);
+            r[8 * i + j] = a - b;
         }
     }
     return r;
-}
-
-// byteopsLoad24 returns a 32-bit unsigned integer loaded from byte x.
-function byteopsLoad24(x) {
-	let r;
-	r = uint32(x[0]);
-	r = r | (uint32(x[1]) << 8);
-	r = r | (uint32(x[2]) << 16);
-	return r;
 }
 
 // byteopsLoad32 returns a 32-bit unsigned integer loaded from byte x.
 function byteopsLoad32(x) {
-	let r;
-	r = uint32(x[0]);
-	r = r | (uint32(x[1]) << 8);
-	r = r | (uint32(x[2]) << 16);
-	r = r | (uint32(x[3]) << 24);
-	return r
+    let r;
+    r = uint32(x[0]);
+    r = (((r | (uint32(x[1]) << 8)) >>> 0) >>> 0);
+    r = (((r | (uint32(x[2]) << 16)) >>> 0) >>> 0);
+    r = (((r | (uint32(x[3]) << 24)) >>> 0) >>> 0);
+    return uint32(r);
 }
 
 // ntt performs an inplace number-theoretic transform (NTT) in `Rq`.
@@ -991,22 +951,25 @@ function nttInverse(r) {
 // compress1 lossily compresses and serializes a vector of polynomials.
 function compress1(u) {
     let rr = 0;
-    let r = new Array(640);
-    let t = new Array(4);
+    let r = new Array(1408); // 4 * 352
+    let t = new Array(8);
     for (let i = 0; i < paramsK; i++) {
-        for (let j = 0; j < paramsN / 4; j++) {
-            for (let k = 0; k < 4; k++) {
-                // parse {0,...,3328} to {0,...,1023}
-                t[k] = (((u[i][4 * j + k] << 10) + paramsQ / 2) / paramsQ) & 0b1111111111;
+        for (let j = 0; j < paramsN/8; j++) {
+            for (let k = 0; k < 8; k++) {
+                t[k] = uint16((((uint32(u[i][8*j+k]) << 11 >>> 0) + uint32(paramsQ/2)) / uint32(paramsQ)) & 0x7ff >>> 0);
             }
-            // converts 4 12-bit coefficients {0,...,3328} to 5 8-bit bytes {0,...,255}
-            // 48 bits down to 40 bits per block
-            r[rr + 0] = byte(t[0] >> 0);
-            r[rr + 1] = byte((t[0] >> 8) | (t[1] << 2));
-            r[rr + 2] = byte((t[1] >> 6) | (t[2] << 4));
-            r[rr + 3] = byte((t[2] >> 4) | (t[3] << 6));
-            r[rr + 4] = byte((t[3] >> 2));
-            rr = rr + 5;
+            r[rr+0] = byte((t[0] >> 0));
+            r[rr+1] = byte((t[0] >> 8) | (t[1] << 3));
+            r[rr+2] = byte((t[1] >> 5) | (t[2] << 6));
+            r[rr+3] = byte((t[2] >> 2));
+            r[rr+4] = byte((t[2] >> 10) | (t[3] << 1));
+            r[rr+5] = byte((t[3] >> 7) | (t[4] << 4));
+            r[rr+6] = byte((t[4] >> 4) | (t[5] << 7));
+            r[rr+7] = byte((t[5] >> 1));
+            r[rr+8] = byte((t[5] >> 9) | (t[6] << 2));
+            r[rr+9] = byte((t[6] >> 6) | (t[7] << 5));
+            r[rr+10] = byte((t[7] >> 3));
+            rr = rr + 11;
         }
     }
     return r;
@@ -1015,40 +978,45 @@ function compress1(u) {
 // compress2 lossily compresses and subsequently serializes a polynomial.
 function compress2(v) {
     let rr = 0;
-    let r = new Array(128);
+    let r = new Array(160);
     let t = new Array(8);
-    for (let i = 0; i < paramsN / 8; i++) {
+    for (let i = 0; i < paramsN/8; i++) {
         for (let j = 0; j < 8; j++) {
-            t[j] = byte(((v[8 * i + j] << 4) + paramsQ / 2) / paramsQ) & 0b1111;
+            t[j] = byte(((uint32(v[8*i+j])<<5 >>> 0)+uint32(paramsQ/2))/uint32(paramsQ)) & 31;
         }
-        r[rr + 0] = t[0] | (t[1] << 4);
-        r[rr + 1] = t[2] | (t[3] << 4);
-        r[rr + 2] = t[4] | (t[5] << 4);
-        r[rr + 3] = t[6] | (t[7] << 4);
-        rr = rr + 4;
+        r[rr+0] = byte((t[0] >> 0) | (t[1] << 5));
+        r[rr+1] = byte((t[1] >> 3) | (t[2] << 2) | (t[3] << 7));
+        r[rr+2] = byte((t[3] >> 1) | (t[4] << 4));
+        r[rr+3] = byte((t[4] >> 4) | (t[5] << 1) | (t[6] << 6));
+        r[rr+4] = byte((t[6] >> 2) | (t[7] << 3));
+        rr = rr + 5;
     }
     return r;
 }
 
 // decompress1 de-serializes and decompresses a vector of polynomials and
 // represents the approximate inverse of compress1. Since compression is lossy,
-// the results of decompression will may not match the original vector of polynomials.
+// the results of decompression may not match the original vector of polynomials.
 function decompress1(a) {
     let r = new Array(paramsK);
     for (let i = 0; i < paramsK; i++) {
         r[i] = new Array(384);
     }
     let aa = 0;
-    let t = new Array(4);
+    let t = new Array(8);
     for (let i = 0; i < paramsK; i++) {
-        for (let j = 0; j < paramsN / 4; j++) {
-            t[0] = (uint16(a[aa + 0]) >> 0) | (uint16(a[aa + 1]) << 8);
-            t[1] = (uint16(a[aa + 1]) >> 2) | (uint16(a[aa + 2]) << 6);
-            t[2] = (uint16(a[aa + 2]) >> 4) | (uint16(a[aa + 3]) << 4);
-            t[3] = (uint16(a[aa + 3]) >> 6) | (uint16(a[aa + 4]) << 2);
-            aa = aa + 5;
-            for (let k = 0; k < 4; k++) {
-                r[i][4 * j + k] = int16((((uint32(t[k] & 0x3FF) >>> 0) * (uint32(paramsQ) >>> 0) >>> 0) + 512) >> 10 >>> 0);
+        for (let j = 0; j < paramsN/8; j++) {
+            t[0] = (uint16(a[aa+0]) >> 0) | (uint16(a[aa+1]) << 8);
+            t[1] = (uint16(a[aa+1]) >> 3) | (uint16(a[aa+2]) << 5);
+            t[2] = (uint16(a[aa+2]) >> 6) | (uint16(a[aa+3]) << 2) | (uint16(a[aa+4]) << 10);
+            t[3] = (uint16(a[aa+4]) >> 1) | (uint16(a[aa+5]) << 7);
+            t[4] = (uint16(a[aa+5]) >> 4) | (uint16(a[aa+6]) << 4);
+            t[5] = (uint16(a[aa+6]) >> 7) | (uint16(a[aa+7]) << 1) | (uint16(a[aa+8]) << 9);
+            t[6] = (uint16(a[aa+8]) >> 2) | (uint16(a[aa+9]) << 6);
+            t[7] = (uint16(a[aa+9]) >> 5) | (uint16(a[aa+10]) << 3);
+            aa = aa + 11;
+            for (let k = 0; k < 8; k++) {
+                r[i][8*j+k] = (uint32(t[k] & 0x7FF) * paramsQ + 1024) >> 11;
             }
         }
     }
@@ -1075,11 +1043,21 @@ function subtract_q(r) {
 // original input.
 function decompress2(a) {
     let r = new Array(384);
+    let t = new Array(8);
     let aa = 0;
-    for (let i = 0; i < paramsN / 2; i++) {
-        r[2 * i + 0] = int16(((uint16(a[aa] & 15) * uint16(paramsQ)) + 8) >> 4);
-        r[2 * i + 1] = int16(((uint16(a[aa] >> 4) * uint16(paramsQ)) + 8) >> 4);
-        aa = aa + 1;
+    for (let i = 0; i < paramsN/8; i++) {
+        t[0] = (a[aa+0] >> 0);
+        t[1] = (a[aa+0] >> 5) | (a[aa+1] << 3);
+        t[2] = (a[aa+1] >> 2);
+        t[3] = (a[aa+1] >> 7) | (a[aa+2] << 1);
+        t[4] = (a[aa+2] >> 4) | (a[aa+3] << 4);
+        t[5] = (a[aa+3] >> 1);
+        t[6] = (a[aa+3] >> 6) | (a[aa+4] << 2);
+        t[7] = (a[aa+4] >> 3);
+        aa = aa + 5;
+        for (let j = 0; j < 8; j++) {
+            r[8*i+j] = int16(((uint32(t[j]&31 >>> 0) * uint32(paramsQ)) + 16) >> 5);
+        }
     }
     return r;
 }
@@ -1190,13 +1168,13 @@ function ArrayCompare(a, b) {
 
 
 // test run function
-function TestK512(){
+function TestK1024(){
 
-    // read values from PQCkemKAT_1632.rsp
+    // read values from PQCkemKAT_3168.rsp
     // sk, ct, ss
 
     let fs = require('fs');
-    let textByLine = fs.readFileSync('PQCkemKAT_1632.rsp').toString().split("\n");
+    let textByLine = fs.readFileSync('PQCkemKAT_3168.rsp').toString().split("\n");
 
     // console.log(textByLine.length); // seems to be an array of strings (lines)
     let sk100 = [];
@@ -1206,7 +1184,7 @@ function TestK512(){
     while (counter < textByLine.length){
         if (textByLine[counter][0] == 'c' && textByLine[counter][1] == 't'){
             let tmp = [];
-            for (j = 0; j < 768; j++) {
+            for (j = 0; j < 1568; j++) {
                 tmp[j] = hexToDec(textByLine[counter][2 * j + 5] + textByLine[counter][2 * j + 1 + 5]);
             }
             ct100.push(tmp);
@@ -1224,7 +1202,7 @@ function TestK512(){
         }
         else if(textByLine[counter][0] == 's' && textByLine[counter][1] == 'k'){
             let tmp = [];
-            for (j = 0; j < 1632; j++) {
+            for (j = 0; j < 3168; j++) {
                 tmp[j] = hexToDec(textByLine[counter][2 * j + 5] + textByLine[counter][2 * j + 1 + 5]);
             }
             sk100.push(tmp);
@@ -1239,9 +1217,9 @@ function TestK512(){
     let failures = 0;
 
     // for each case (100 total)
-    // test if ss equals Decrypt512(c,sk)
+    // test if ss equals Decrypt1024(c,sk)
     for (let i=0; i<100; i++){
-        let ss2 = Decrypt512(ct100[i],sk100[i]);
+        let ss2 = Decrypt1024(ct100[i],sk100[i]);
 
         // success if both symmetric keys are the same
         if (ArrayCompare(ss100[i], ss2)){
@@ -1267,36 +1245,22 @@ function TestK512(){
 // Test here
 /*****************************************************************************************************************************/
 
-TestK512();
+TestK1024();
 
 // To generate a public and private key pair (pk, sk)
-let pk_sk = KeyGen512();
+let pk_sk = KeyGen1024();
 let pk = pk_sk[0];
 let sk = pk_sk[1];
 
-/*
-process.stdout.write('pk: [');
-for (var i=0; i<pk.length; i++){
-    process.stdout.write(pk[i] + ', ');
-}
-process.stdout.write('] \n');
-
-process.stdout.write('sk: [');
-for (var i=0; i<sk.length; i++){
-    process.stdout.write(sk[i] + ', ');
-}
-process.stdout.write('] \n');
-*/
-
 // To generate a random 256 bit symmetric key (ss) and its encapsulation (c)
-let c_ss = Encrypt512(pk);
+let c_ss = Encrypt1024(pk);
 let c = c_ss[0];
 let ss1 = c_ss[1];
 
 // To decapsulate and obtain the same symmetric key
-let ss2 = Decrypt512(c, sk);
+let ss2 = Decrypt1024(c, sk);
 
-console.log("ss1", ss1);
+console.log("ss1",ss1);
 console.log("ss2",ss2);
 
 // returns 1 if both symmetric keys are the same
