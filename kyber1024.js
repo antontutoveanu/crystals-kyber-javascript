@@ -1270,4 +1270,4 @@ console.log(ArrayCompare(ss1, ss2));
 
 /*****************************************************************************************************************************/
 
-module.exports = { KeyGen1024, Encrypt1024, Decrypt1024, TestK1024 };
+module.exports = { KeyGen1024, Encrypt1024, Decrypt1024 };

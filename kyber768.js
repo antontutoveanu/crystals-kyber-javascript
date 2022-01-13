@@ -1262,4 +1262,4 @@ console.log(ArrayCompare(ss1, ss2));
 
 /*****************************************************************************************************************************/
 
-module.exports = { KeyGen768, Encrypt768, Decrypt768, TestK768 };
+module.exports = { KeyGen768, Encrypt768, Decrypt768 };
