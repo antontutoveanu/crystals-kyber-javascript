@@ -136,12 +136,7 @@ function KeyGen1024() {
     const buffer1 = Buffer.from(pk);
     const hash1 = new SHA3(256);
     hash1.update(buffer1);
-    let buf_str = hash1.digest('hex');
-    // convert hex string to array
-    let pkh = new Array(32);
-    for (i = 0; i < 32; i++) {
-        pkh[i] = hexToDec(buf_str[2 * i] + buf_str[2 * i + 1]);
-    }
+    let pkh = hash1.digest();
 
     // read 32 random values (0-255) into a 32 byte array
     let rnd = new Array(32);
@@ -179,35 +174,20 @@ function Encrypt1024(pk) {
     const buffer1 = Buffer.from(m);
     const hash1 = new SHA3(256);
     hash1.update(buffer1);
-    let buf_tmp = hash1.digest('hex');
-    // convert hex string to array
-    let mh = new Array(32);
-    for (i = 0; i < 32; i++) {
-        mh[i] = hexToDec(buf_tmp[2 * i] + buf_tmp[2 * i + 1]);
-    }
+    let mh = hash1.digest();
 
     // hash pk with SHA3-256
     const buffer2 = Buffer.from(pk);
     const hash2 = new SHA3(256);
     hash2.update(buffer2);
-    buf_tmp = hash2.digest('hex');
-    // convert hex string to array
-    let pkh = new Array(32);
-    for (i = 0; i < 32; i++) {
-        pkh[i] = hexToDec(buf_tmp[2 * i] + buf_tmp[2 * i + 1]);
-    }
+    let pkh = hash2.digest();
 
     // hash mh and pkh with SHA3-512
     const buffer3 = Buffer.from(mh);
     const buffer4 = Buffer.from(pkh);
     const hash3 = new SHA3(512);
     hash3.update(buffer3).update(buffer4);
-    let kr_str = hash3.digest('hex');
-    // convert hex string to array
-    let kr = new Array(32);
-    for (i = 0; i < 64; i++) {
-        kr[i] = hexToDec(kr_str[2 * i] + kr_str[2 * i + 1]);
-    }
+    let kr = hash3.digest();
     let kr1 = kr.slice(0, 32);
     let kr2 = kr.slice(32, 64);
 
@@ -218,24 +198,14 @@ function Encrypt1024(pk) {
     const buffer5 = Buffer.from(c);
     const hash4 = new SHA3(256);
     hash4.update(buffer5);
-    let ch_str = hash4.digest('hex');
-    // convert hex string to array
-    let ch = new Array(32);
-    for (i = 0; i < 32; i++) {
-        ch[i] = hexToDec(ch_str[2 * i] + ch_str[2 * i + 1]);
-    }
+    let ch = hash4.digest();
 
     // hash kr1 and ch with SHAKE-256
     const buffer6 = Buffer.from(kr1);
     const buffer7 = Buffer.from(ch);
     const hash5 = new SHAKE(256);
     hash5.update(buffer6).update(buffer7);
-    let ss_str = hash5.digest('hex');
-    // convert hex string to array
-    let ss = new Array(32);
-    for (i = 0; i < 32; i++) {
-        ss[i] = hexToDec(ss_str[2 * i] + ss_str[2 * i + 1]);
-    }
+    let ss = hash5.digest();
 
     // output (c, ss)
     let result = new Array(2);
@@ -262,12 +232,7 @@ function Decrypt1024(c, privateKey) {
     const buffer2 = Buffer.from(pkh);
     const hash1 = new SHA3(512);
     hash1.update(buffer1).update(buffer2);
-    let kr_str = hash1.digest('hex');
-    // convert hex string to array
-    let kr = new Array(64);
-    for (i = 0; i < 64; i++) {
-        kr[i] = hexToDec(kr_str[2 * i] + kr_str[2 * i + 1]);
-    }
+    let kr = hash1.digest();
     let kr1 = kr.slice(0, 32);
     let kr2 = kr.slice(32, 64);
 
@@ -281,25 +246,16 @@ function Decrypt1024(c, privateKey) {
     const buffer3 = Buffer.from(c);
     const hash2 = new SHA3(256);
     hash2.update(buffer3);
-    let ch_str = hash2.digest('hex');
-    // convert hex string to array
-    let ch = new Array(32);
-    for (i = 0; i < 32; i++) {
-        ch[i] = hexToDec(ch_str[2 * i] + ch_str[2 * i + 1]);
-    }
+    let ch = hash2.digest();
 
-    let ss = new Array(32);
+    let ss = [];
     if (!fail){
         // hash kr1 and ch with SHAKE-256
         const buffer4 = Buffer.from(kr1);
         const buffer5 = Buffer.from(ch);
         const hash3 = new SHAKE(256);
         hash3.update(buffer4).update(buffer5);
-        let ss_str = hash3.digest('hex');
-        // convert hex string to array
-        for (i = 0; i < 32; i++) {
-            ss[i] = hexToDec(ss_str[2 * i] + ss_str[2 * i + 1]);
-        }
+        ss = hash3.digest();
     } 
     else{
         // hash z and ch with SHAKE-256
@@ -307,11 +263,7 @@ function Decrypt1024(c, privateKey) {
         const buffer7 = Buffer.from(ch);
         const hash4 = new SHAKE(256);
         hash4.update(buffer6).update(buffer7);
-        let ss_str = hash4.digest('hex');
-        // convert hex string to array
-        for (i = 0; i < 32; i++) {
-            ss[i] = hexToDec(ss_str[2 * i] + ss_str[2 * i + 1]);
-        }
+        ss = hash4.digest();
     }
     return ss;
 }
@@ -330,12 +282,7 @@ function indcpaKeyGen() {
     const buffer1 = Buffer.from(rnd);
     const hash1 = new SHA3(512);
     hash1.update(buffer1);
-    let seed_str = hash1.digest('hex');
-    // convert hex string to array
-    let seed = new Array(64);
-    for (i = 0; i < 64; i++) {
-        seed[i] = hexToDec(seed_str[2 * i] + seed_str[2 * i + 1]);
-    }
+    let seed = hash1.digest();
     let publicSeed = seed.slice(0, 32);
     let noiseSeed = seed.slice(32, 64);
 
@@ -654,11 +601,7 @@ function generateMatrixA(seed, transposed) {
             const buffer1 = Buffer.from(seed);
             const buffer2 = Buffer.from(transpose);
             xof.update(buffer1).update(buffer2);
-            let buf_str = xof.digest({ buffer: Buffer.alloc(672), format: 'hex' });
-            // convert hex string to array
-            for (let n = 0; n < 672; n++) {
-                output[n] = hexToDec(buf_str[2 * n] + buf_str[2 * n + 1]);
-            }
+            let output = xof.digest({ buffer: Buffer.alloc(672)});
 
             // run rejection sampling on the output from above
             let outputlen = 3 * 168; // 504
@@ -738,7 +681,6 @@ function sample(seed, nonce) {
 // a byte array of length `l`, using the provided key and nonce
 // to instantiate the PRF's underlying hash function.
 function prf(l, key, nonce) {
-    let buf = new Array(l);
     let nonce_arr = new Array(1);
     nonce_arr[0] = nonce;
     const hash = new SHAKE(256);
@@ -746,11 +688,7 @@ function prf(l, key, nonce) {
     const buffer1 = Buffer.from(key);
     const buffer2 = Buffer.from(nonce_arr);
     hash.update(buffer1).update(buffer2);
-    let hash_str = hash.digest({ buffer: Buffer.alloc(l), format: 'hex' }); // 128 long byte array
-    // convert hex string to array
-    for (let n = 0; n < l; n++) {
-        buf[n] = hexToDec(hash_str[2 * n] + hash_str[2 * n + 1]);
-    }
+    let buf = hash.digest({ buffer: Buffer.alloc(l)}); // 128 long byte array
     return buf;
 }
 
