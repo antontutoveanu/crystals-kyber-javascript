@@ -1,7 +1,7 @@
 /*****************************************************************************************************************************/
 // imports
-const { SHA3 } = require('sha3');
-const { SHAKE } = require('sha3');
+const { SHA3, SHAKE } = require('sha3');
+const webcrypto = require('crypto').webcrypto;
 /*****************************************************************************************************************************/
 const nttZetas = [
     2285, 2571, 2970, 1812, 1493, 1422, 287, 202, 3158, 622, 1577, 182, 962,
@@ -34,93 +34,6 @@ const paramsQinv = 62209;
 const paramsETA1 = 3;
 const paramsETA2 = 2;
 /*****************************************************************************************************************************/
-// ----------------------------------------------------------------------------------------------
-// From http://baagoe.com/en/RandomMusings/javascript/
-// Johannes Baagøe <baagoe@baagoe.com>, 2010
-// ----------------------------------------------------------------------------------------------
-// From: https://github.com/FuKyuToTo/lattice-based-cryptography
-// ----------------------------------------------------------------------------------------------
-// Secure Random Integer Generator
-function Mash() {
-    let n = 0xefc8249d;
-
-    let mash = function (data) {
-        data = data.toString();
-        for (let i = 0; i < data.length; i++) {
-            n += data.charCodeAt(i);
-            let h = 0.02519603282416938 * n;
-            n = h >>> 0;
-            h -= n;
-            h *= n;
-            n = h >>> 0;
-            h -= n;
-            n += h * 0x100000000; // 2^32
-        }
-        return (n >>> 0) * 2.3283064365386963e-10; // 2^-32
-    };
-    mash.version = "Mash 0.9";
-    return mash;
-}
-function Alea() {
-    return (function (args) {
-        let s0 = 0;
-        let s1 = 0;
-        let s2 = 0;
-        let c = 1;
-
-        if (args.length === 0) {
-            args = [+new Date()];
-        }
-        let mash = Mash();
-        s0 = mash(" ");
-        s1 = mash(" ");
-        s2 = mash(" ");
-
-        for (let i = 0; i < args.length; i++) {
-            s0 -= mash(args[i]);
-            if (s0 < 0) {
-                s0 += 1;
-            }
-            s1 -= mash(args[i]);
-            if (s1 < 0) {
-                s1 += 1;
-            }
-            s2 -= mash(args[i]);
-            if (s2 < 0) {
-                s2 += 1;
-            }
-        }
-        mash = null;
-
-        let random = function () {
-            let t = 2091639 * s0 + c * 2.3283064365386963e-10; // 2^-32
-            s0 = s1;
-            s1 = s2;
-            return (s2 = t - (c = t | 0));
-        };
-        random.uint32 = function () {
-            return random() * 0x100000000; // 2^32
-        };
-        random.fract53 = function () {
-            return random() + ((random() * 0x200000) | 0) * 1.1102230246251565e-16; // 2^-53
-        };
-        random.version = "Alea 0.9";
-        random.args = args;
-        return random;
-    })(Array.prototype.slice.call(arguments));
-}
-//prng
-let random = Alea();
-let seed = random.args;
-random = Alea(seed);
-// Returns the next pseudorandom, uniformly distributed integer between 0(inclusive) and q-1(inclusive)
-function nextInt(n) {
-    return Math.floor(random() * n); //prng.js -> random()
-}
-function hexToDec(hexString) {
-    return parseInt(hexString, 16);
-}
-/*****************************************************************************************************************************/
 // CRYSTALS-KYBER JAVASCRIPT
 
 // 1. KeyGen
@@ -140,10 +53,8 @@ function KeyGen512() {
     let pkh = hash1.digest();
 
     // read 32 random values (0-255) into a 32 byte array
-    let rnd = new Array(32);
-    for (let i = 0; i < 32; i++) {
-        rnd[i] = nextInt(256);
-    }
+    let rnd = new Uint8Array(32);
+    webcrypto.getRandomValues(rnd); // web api cryptographically strong random values
 
     // concatenate to form IND-CCA2 private key: sk + pk + h(pk) + rnd
     for (let i = 0; i < pk.length; i++) {
@@ -166,10 +77,8 @@ function KeyGen512() {
 function Encrypt512(pk) {
 
     // random 32 bytes
-    let m = new Array(32);
-    for (let i = 0; i < 32; i++) {
-        m[i] = nextInt(256);
-    }
+    let m = new Uint8Array(32);
+    webcrypto.getRandomValues(m); // web api cryptographically strong random values
 
     // hash m with SHA3-256
     const buffer1 = Buffer.from(m);
@@ -274,10 +183,8 @@ function Decrypt512(c, privateKey) {
 function indcpaKeyGen() {
 
     // random bytes for seed
-    let rnd = new Array(32);
-    for (let i = 0; i < 32; i++) {
-        rnd[i] = nextInt(256);
-    }
+    let rnd = new Uint8Array(32);
+    webcrypto.getRandomValues(rnd); // web api cryptographically strong random values
 
     // hash rnd with SHA3-512
     const buffer1 = Buffer.from(rnd);
@@ -1125,7 +1032,9 @@ function ArrayCompare(a, b) {
     }
     return 1;
 }
-
+function hexToDec(hexString) {
+    return parseInt(hexString, 16);
+}
 
 // test run function
 function TestK512(){
