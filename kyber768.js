@@ -36,7 +36,7 @@ const paramsETA = 2;
 // CRYSTALS-KYBER JAVASCRIPT
 
 // 1. KeyGen
-function KeyGen768() {
+KeyGen768 = function() {
     // IND-CPA keypair
     let indcpakeys = indcpaKeyGen();
 
@@ -73,7 +73,7 @@ function KeyGen768() {
 }
 /*****************************************************************************************************************************/
 // 2. Encrypt
-function Encrypt768(pk) {
+Encrypt768 = function(pk) {
 
     // random 32 bytes m
     let m = new Uint8Array(32);
@@ -96,7 +96,7 @@ function Encrypt768(pk) {
     const buffer4 = Buffer.from(pkh);
     const hash3 = new SHA3(512);
     hash3.update(buffer3).update(buffer4);
-    let kr = hash3.digest();
+    let kr = new Uint8Array(hash3.digest());
     let kr1 = kr.slice(0, 32);
     let kr2 = kr.slice(32, 64);
 
@@ -125,7 +125,7 @@ function Encrypt768(pk) {
 }
 /*****************************************************************************************************************************/
 // 3. Decrypt
-function Decrypt768(c, privateKey) {
+Decrypt768 = function(c, privateKey) {
 
     // extract sk, pk, pkh and z
     let sk = privateKey.slice(0, 1152);
@@ -141,7 +141,7 @@ function Decrypt768(c, privateKey) {
     const buffer2 = Buffer.from(pkh);
     const hash1 = new SHA3(512);
     hash1.update(buffer1).update(buffer2);
-    let kr = hash1.digest();
+    let kr = new Uint8Array(hash1.digest());
     let kr1 = kr.slice(0, 32);
     let kr2 = kr.slice(32, 64);
 
@@ -190,7 +190,7 @@ function indcpaKeyGen() {
     const buffer1 = Buffer.from(rnd);
     const hash1 = new SHA3(512);
     hash1.update(buffer1);
-    let seed = hash1.digest();
+    let seed = new Uint8Array(hash1.digest());
     let publicSeed = seed.slice(0, 32);
     let noiseSeed = seed.slice(32, 64);
 
@@ -517,7 +517,7 @@ function generateMatrixA(seed, transposed) {
             const buffer1 = Buffer.from(seed);
             const buffer2 = Buffer.from(transpose);
             xof.update(buffer1).update(buffer2);
-            let output = xof.digest({ buffer: Buffer.alloc(672)});
+            let output = new Uint8Array(xof.digest({ buffer: Buffer.alloc(672)}));
 
             // run rejection sampling on the output from above
             let outputlen = 3 * 168; // 504
@@ -1005,13 +1005,12 @@ function hexToDec(hexString) {
     return parseInt(hexString, 16);
 }
 // test run function
-function TestK768(){
-
+Test768 = function(){
     // read values from PQCkemKAT_2400.rsp
     // sk, ct, ss
 
     let fs = require('fs');
-    let textByLine = fs.readFileSync('PQCkemKAT_2400.rsp').toString().split("\n");
+    let textByLine = fs.readFileSync('./node_modules/crystals-kyber/PQCkemKAT_2400.rsp').toString().split("\n");
 
     // console.log(textByLine.length); // seems to be an array of strings (lines)
     let sk100 = [];
@@ -1076,36 +1075,31 @@ function TestK768(){
         console.log(" ");
         console.log(failures, " test cases have failed.")
     }
+
+    // To generate a public and private key pair (pk, sk)
+    let pk_sk = KeyGen768();
+    let pk = pk_sk[0];
+    let sk = pk_sk[1];
+
+    // To generate a random 256 bit symmetric key (ss) and its encapsulation (c)
+    let c_ss = Encrypt768(pk);
+    let c = c_ss[0];
+    let ss1 = c_ss[1];
+
+    // To decapsulate and obtain the same symmetric key
+    let ss2 = Decrypt768(c, sk);
+
+    console.log();
+    console.log("ss1", ss1);
+    console.log("ss2",ss2);
+
+    // returns 1 if both symmetric keys are the same
+    console.log(ArrayCompare(ss1, ss2));
     return
 }
 
-/*****************************************************************************************************************************/
-// Test here
-/*****************************************************************************************************************************/
-
-/*
-TestK768();
-
-// To generate a public and private key pair (pk, sk)
-let pk_sk = KeyGen768();
-let pk = pk_sk[0];
-let sk = pk_sk[1];
-
-// To generate a random 256 bit symmetric key (ss) and its encapsulation (c)
-let c_ss = Encrypt768(pk);
-let c = c_ss[0];
-let ss1 = c_ss[1];
-
-// To decapsulate and obtain the same symmetric key
-let ss2 = Decrypt768(c, sk);
-
-console.log("ss1", ss1);
-console.log("ss2",ss2);
-
-// returns 1 if both symmetric keys are the same
-console.log(ArrayCompare(ss1, ss2));
-*/
-
-/*****************************************************************************************************************************/
-
-module.exports = { KeyGen768, Encrypt768, Decrypt768 };
+// Export functions to index.js (entry point)
+exports.KeyGen768 = KeyGen768;
+exports.Encrypt768 = Encrypt768;
+exports.Decrypt768 = Decrypt768;
+exports.Test768 = Test768;
