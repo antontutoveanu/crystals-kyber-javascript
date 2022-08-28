@@ -24,7 +24,7 @@ This code is the most up to date version based off the [NIST PQC Round 3 Submiss
 
 The exchange can be visualised below:
 
-![](./diagram.jpeg)
+![](./diagram.svg)
 
 ## Usage
 Using Node.js or React:
@@ -56,7 +56,7 @@ kyber.Test768();
 ```
 ## Running Tests
 Output from function `kyber.Test768()` that tests compatibility with the C implementation based on run cases in `PQCkemKAT_2400.rsp`.
-```bash
+```
 Test run [ 0 ] success
 Test run [ 1 ] success
 Test run [ 2 ] success
