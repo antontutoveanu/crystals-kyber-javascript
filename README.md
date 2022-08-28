@@ -8,7 +8,7 @@
 
 This protocol is used to securely establish symmetric keys between two parties. 
 
-This JavaScript implementation is intended for client-side web browser applications and serve-side backends in Node.js frameworks.
+This JavaScript implementation is intended for client-side web browser applications and server-side backends in Node.js frameworks.
 
 Most of this code was translated from a Go implementation of Kyber which can be found [here](https://github.com/symbolicsoft/kyber-k2so).
 
@@ -20,7 +20,7 @@ This code is the most up to date version based off the [NIST PQC Round 3 Submiss
 
 ## Functionality
 
-**KYBER** will securely distribute a 256 bit symmetric key between two parties. To safely transmit data over a channel using the key, AES-256 along with an authentication tag are recommended.
+**KYBER** will securely distribute a 256 bit symmetric key between two parties. To safely transmit data over a channel using the key, an AEAD is advised (such as AES-256-GCM).
 
 The exchange can be visualised below:
 
