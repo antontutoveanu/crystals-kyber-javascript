@@ -30,7 +30,6 @@ The exchange can be visualised below:
 Using Node.js or React:
 ```bash
 npm install crystals-kyber
-npm install sha3
 ```
 Import the module at the top of your js file.
 ```js
