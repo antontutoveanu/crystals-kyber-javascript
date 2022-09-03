@@ -27,7 +27,7 @@ The exchange can be visualised below:
 ![](./diagram.svg)
 
 ## Usage
-Using Node.js or React:
+Using Node.js (v16.17.0) or React:
 ```bash
 npm install crystals-kyber
 ```
