@@ -180,11 +180,14 @@ Decrypt768 = function(c, privateKey) {
 
 // indcpaKeyGen generates public and private keys for the CPA-secure
 // public-key encryption scheme underlying Kyber.
-function indcpaKeyGen() {
+function indcpaKeyGen(seed) {
 
-    // random bytes for seed
-    let rnd = new Uint8Array(32);
-    webcrypto.getRandomValues(rnd); // web api cryptographically strong random values
+    // random bytes for seed or user-provided seed
+    
+    let rnd =seed?seed: new Uint8Array(32);
+    if(!seed){
+        webcrypto.getRandomValues(rnd); // web api cryptographically strong random values
+    } 
 
     // hash rnd with SHA3-512
     const buffer1 = Buffer.from(rnd);
