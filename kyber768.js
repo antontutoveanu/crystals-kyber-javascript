@@ -36,9 +36,9 @@ const paramsETA = 2;
 // CRYSTALS-KYBER JAVASCRIPT
 
 // 1. KeyGen
-KeyGen768 = function() {
+KeyGen768 = function(seed) {// Seed - 64 byte array (Uint8Array(64))
     // IND-CPA keypair
-    let indcpakeys = indcpaKeyGen();
+    let indcpakeys = indcpaKeyGen(seed?seed.slice(0,32):null);
 
     let pk = indcpakeys[0];
     let sk = indcpakeys[1];
@@ -52,9 +52,13 @@ KeyGen768 = function() {
     let pkh = hash1.digest();
 
     // read 32 random values (0-255) into a 32 byte array
-    let rnd = new Uint8Array(32);
+    let rnd;
+    if(!seed||seed.length<64){
+    rnd = new Uint8Array(32);
     webcrypto.getRandomValues(rnd); // web api cryptographically strong random values
-
+    }else{
+    rnd=seed.slice(32,64)
+    }
     // concatenate to form IND-CCA2 private key: sk + pk + h(pk) + rnd
     for (let i = 0; i < pk.length; i++) {
         sk.push(pk[i]);
@@ -180,11 +184,14 @@ Decrypt768 = function(c, privateKey) {
 
 // indcpaKeyGen generates public and private keys for the CPA-secure
 // public-key encryption scheme underlying Kyber.
-function indcpaKeyGen() {
+function indcpaKeyGen(seed) {// seed - 32 byte array (Uint8Array(32))
 
-    // random bytes for seed
-    let rnd = new Uint8Array(32);
-    webcrypto.getRandomValues(rnd); // web api cryptographically strong random values
+    // random bytes for seed or user-provided seed
+    
+    let rnd =seed?seed: new Uint8Array(32);
+    if(!seed||seed.length<32){
+        webcrypto.getRandomValues(rnd); // web api cryptographically strong random values
+    } 
 
     // hash rnd with SHA3-512
     const buffer1 = Buffer.from(rnd);
