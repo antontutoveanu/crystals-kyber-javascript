@@ -1,7 +1,7 @@
 /*****************************************************************************************************************************/
 // imports
 const { SHA3, SHAKE } = require('sha3');
-const webcrypto = require('crypto').webcrypto;
+const webcrypto = window.crypto
 /*****************************************************************************************************************************/
 const nttZetas = [
     2285, 2571, 2970, 1812, 1493, 1422, 287, 202, 3158, 622, 1577, 182, 962,
@@ -1036,102 +1036,7 @@ function hexToDec(hexString) {
     return parseInt(hexString, 16);
 }
 
-// test run function
-Test512 = function(){
-    // read values from PQCkemKAT_1632.rsp
-    // sk, ct, ss
-
-    let fs = require('fs');
-    let textByLine = fs.readFileSync('./node_modules/crystals-kyber/PQCkemKAT_1632.rsp').toString().split("\n");
-
-    // console.log(textByLine.length); // seems to be an array of strings (lines)
-    let sk100 = [];
-    let ct100 = [];
-    let ss100 = [];
-    let counter = 0;
-    while (counter < textByLine.length){
-        if (textByLine[counter][0] == 'c' && textByLine[counter][1] == 't'){
-            let tmp = [];
-            for (j = 0; j < 768; j++) {
-                tmp[j] = hexToDec(textByLine[counter][2 * j + 5] + textByLine[counter][2 * j + 1 + 5]);
-            }
-            ct100.push(tmp);
-            counter = counter + 1;
-            continue;
-        }
-        else if(textByLine[counter][0] == 's' && textByLine[counter][1] == 's'){
-            let tmp = [];
-            for (j = 0; j < 32; j++) {
-                tmp[j] = hexToDec(textByLine[counter][2 * j + 5] + textByLine[counter][2 * j + 1 + 5]);
-            }
-            ss100.push(tmp);
-            counter = counter + 1;
-            continue;
-        }
-        else if(textByLine[counter][0] == 's' && textByLine[counter][1] == 'k'){
-            let tmp = [];
-            for (j = 0; j < 1632; j++) {
-                tmp[j] = hexToDec(textByLine[counter][2 * j + 5] + textByLine[counter][2 * j + 1 + 5]);
-            }
-            sk100.push(tmp);
-            counter = counter + 1;
-            continue;
-        }
-        else{
-            counter = counter + 1;
-        }
-    }
-
-    let failures = 0;
-
-    // for each case (100 total)
-    // test if ss equals Decrypt512(c,sk)
-    for (let i=0; i<100; i++){
-        let ss2 = Decrypt512(ct100[i],sk100[i]);
-
-        // success if both symmetric keys are the same
-        if (ArrayCompare(ss100[i], ss2)){
-            console.log("Test run [", i, "] success");
-        }
-        else{
-            console.log("Test run [", i, "] fail");
-            failures += 1;
-        }
-    }
-
-    if(failures==0){
-        console.log(" ");
-        console.log("All test runs successful.")
-    }
-    else{
-        console.log(" ");
-        console.log(failures, " test cases have failed.")
-    }
-
-    // To generate a public and private key pair (pk, sk)
-    let pk_sk = KeyGen512();
-    let pk = pk_sk[0];
-    let sk = pk_sk[1];
-
-    // To generate a random 256 bit symmetric key (ss) and its encapsulation (c)
-    let c_ss = Encrypt512(pk);
-    let c = c_ss[0];
-    let ss1 = c_ss[1];
-
-    // To decapsulate and obtain the same symmetric key
-    let ss2 = Decrypt512(c, sk);
-
-    console.log();
-    console.log("ss1", ss1);
-    console.log("ss2",ss2);
-
-    // returns 1 if both symmetric keys are the same
-    console.log(ArrayCompare(ss1, ss2));
-    return
-}
-
 // Export functions to index.js (entry point)
 exports.KeyGen512 = KeyGen512;
 exports.Encrypt512 = Encrypt512;
 exports.Decrypt512 = Decrypt512;
-exports.Test512 = Test512;

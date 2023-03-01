@@ -49,6 +49,33 @@ let ss1 = c_ss[1];
 
 // To decapsulate and obtain the same symmetric key
 let ss2 = kyber.Decrypt768(c,sk);
+```
+## Running Kyber in browser
+
+Install browserify and create a file named main.js, with the following code inside:
+
+```js
+const kyber = require('crystals-kyber');
+
+// To generate a public and private key pair (pk, sk)
+let pk_sk = kyber.KeyGen768();
+let pk = pk_sk[0];
+let sk = pk_sk[1];
+
+// To generate a random 256 bit symmetric key (ss) and its encapsulation (c)
+let c_ss = kyber.Encrypt768(pk);
+let c = c_ss[0];
+let ss1 = c_ss[1];
+
+// To decapsulate and obtain the same symmetric key
+let ss2 = kyber.Decrypt768(c,sk);
+```
+
+Now in terminal, do this: 
+``` bash
+browserify main.js > bundle.js -d 
+```
+and include the bundle file in your static js folder and make sure to include the bundle script tag in the HTML file as well.
 
 // Test function with KATs
 kyber.Test768();
