@@ -457,7 +457,12 @@ function polyToMsg(a) {
     for (let i = 0; i < paramsN / 8; i++) {
         msg[i] = 0;
         for (let j = 0; j < 8; j++) {
-            t = (((uint16(a2[8 * i + j]) << 1) + uint16(paramsQ / 2)) / uint16(paramsQ)) & 1;
+            t = uint32(a2[8 * i + j]);
+            t <<= 1;
+            t += 1665;
+            t *= 80635;
+            t >>= 28;
+            t &= 1;
             msg[i] |= byte(t << j);
         }
     }
