@@ -1003,17 +1003,18 @@ function uint32(n) {
 
 // compares two arrays and returns 1 if they are the same or 0 if not
 function ArrayCompare(a, b) {
-    // check array lengths
+    // length is public information; early-out on it is safe
     if (a.length != b.length) {
         return 0;
     }
-    // check contents
+    // constant-time contents comparison: OR all byte differences,
+    // never exit early, so timing does not reveal the first-difference index
+    let diff = 0;
     for (let i = 0; i < a.length; i++) {
-        if (a[i] != b[i]) {
-            return 0;
-        }
+        diff |= a[i] ^ b[i];
     }
-    return 1;
+    // convert diff to match the existing return contract; 1 = equal, 0 = not equal
+    return diff === 0 ? 1 : 0;
 }
 function hexToDec(hexString) {
     return parseInt(hexString, 16);
