@@ -24,7 +24,7 @@ This code is the most up to date version based off the [NIST PQC Round 3 Submiss
 
 The exchange can be visualised below:
 
-![](./diagram.svg)
+![](./diagram.png)
 
 ## Usage
 Using Node.js (v16.17.0) or React:
